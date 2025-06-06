@@ -1,0 +1,6 @@
+D:\EnforceSolutionBackup\node_modules\@react-native-community\geolocation\android\build\generated\source\codegen\jni\CMakeLists.txt
+D:\EnforceSolutionBackup\node_modules\react-native-gesture-handler\android\build\generated\source\codegen\jni\CMakeLists.txt
+D:\EnforceSolutionBackup\node_modules\react-native-maps\android\src\main\jni\CMakeLists.txt
+D:\EnforceSolutionBackup\node_modules\react-native-svg\android\src\main\jni\CMakeLists.txt
+D:\EnforceSolutionBackup\node_modules\react-native-vector-icons\android\build\generated\source\codegen\jni\CMakeLists.txt
+D:\EnforceSolutionBackup\node_modules\react-native\ReactAndroid\cmake-utils\default-app-setup\CMakeLists.txt

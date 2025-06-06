@@ -1,0 +1,67 @@
+{
+  "buildFiles": [
+    "D:\\EnforceSolutionBackup\\node_modules\\@react-native-community\\geolocation\\android\\build\\generated\\source\\codegen\\jni\\CMakeLists.txt",
+    "D:\\EnforceSolutionBackup\\node_modules\\react-native-gesture-handler\\android\\build\\generated\\source\\codegen\\jni\\CMakeLists.txt",
+    "D:\\EnforceSolutionBackup\\node_modules\\react-native-maps\\android\\src\\main\\jni\\CMakeLists.txt",
+    "D:\\EnforceSolutionBackup\\node_modules\\react-native-svg\\android\\src\\main\\jni\\CMakeLists.txt",
+    "D:\\EnforceSolutionBackup\\node_modules\\react-native-vector-icons\\android\\build\\generated\\source\\codegen\\jni\\CMakeLists.txt",
+    "D:\\EnforceSolutionBackup\\node_modules\\react-native\\ReactAndroid\\cmake-utils\\default-app-setup\\CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "C:\\Users\\Athar\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+      "-C",
+      "D:\\EnforceSolutionBackup\\android\\app\\.cxx\\Debug\\6f3u6i28\\x86",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "C:\\Users\\Athar\\AppData\\Local\\Android\\Sdk\\cmake\\3.22.1\\bin\\ninja.exe",
+    "-C",
+    "D:\\EnforceSolutionBackup\\android\\app\\.cxx\\Debug\\6f3u6i28\\x86",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "react_codegen_RNVectorIconsSpec::@479809fae146501fd34d": {
+      "artifactName": "react_codegen_RNVectorIconsSpec",
+      "abi": "x86",
+      "runtimeFiles": []
+    },
+    "react_codegen_rngesturehandler_codegen::@39f233abcd2c728bc6ec": {
+      "artifactName": "react_codegen_rngesturehandler_codegen",
+      "abi": "x86",
+      "runtimeFiles": []
+    },
+    "appmodules::@6890427a1f51a3e7e1df": {
+      "artifactName": "appmodules",
+      "abi": "x86",
+      "output": "D:\\EnforceSolutionBackup\\android\\app\\build\\intermediates\\cxx\\Debug\\6f3u6i28\\obj\\x86\\libappmodules.so",
+      "runtimeFiles": [
+        "D:\\EnforceSolutionBackup\\android\\app\\build\\intermediates\\cxx\\Debug\\6f3u6i28\\obj\\x86\\libreact_codegen_rnsvg.so",
+        "C:\\Users\\Athar\\.gradle\\caches\\8.13\\transforms\\72cde7dc85b5006383f56c98fcfedfa5\\transformed\\fbjni-0.7.0\\prefab\\modules\\fbjni\\libs\\android.x86\\libfbjni.so",
+        "C:\\Users\\Athar\\.gradle\\caches\\8.13\\transforms\\8cb416b8178cb0e7f140959230f7f0bf\\transformed\\react-android-0.79.2-debug\\prefab\\modules\\jsi\\libs\\android.x86\\libjsi.so",
+        "C:\\Users\\Athar\\.gradle\\caches\\8.13\\transforms\\8cb416b8178cb0e7f140959230f7f0bf\\transformed\\react-android-0.79.2-debug\\prefab\\modules\\reactnative\\libs\\android.x86\\libreactnative.so"
+      ]
+    },
+    "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65": {
+      "artifactName": "react_codegen_rnsvg",
+      "abi": "x86",
+      "output": "D:\\EnforceSolutionBackup\\android\\app\\build\\intermediates\\cxx\\Debug\\6f3u6i28\\obj\\x86\\libreact_codegen_rnsvg.so",
+      "runtimeFiles": [
+        "C:\\Users\\Athar\\.gradle\\caches\\8.13\\transforms\\8cb416b8178cb0e7f140959230f7f0bf\\transformed\\react-android-0.79.2-debug\\prefab\\modules\\reactnative\\libs\\android.x86\\libreactnative.so",
+        "C:\\Users\\Athar\\.gradle\\caches\\8.13\\transforms\\8cb416b8178cb0e7f140959230f7f0bf\\transformed\\react-android-0.79.2-debug\\prefab\\modules\\jsi\\libs\\android.x86\\libjsi.so",
+        "C:\\Users\\Athar\\.gradle\\caches\\8.13\\transforms\\72cde7dc85b5006383f56c98fcfedfa5\\transformed\\fbjni-0.7.0\\prefab\\modules\\fbjni\\libs\\android.x86\\libfbjni.so"
+      ]
+    },
+    "react_codegen_RNMapsSpecs::@5748abef1962d24942ec": {
+      "artifactName": "react_codegen_RNMapsSpecs",
+      "abi": "x86",
+      "runtimeFiles": []
+    },
+    "react_codegen_RNCGeolocationSpec::@1b959fcb56e23f7716ba": {
+      "artifactName": "react_codegen_RNCGeolocationSpec",
+      "abi": "x86",
+      "runtimeFiles": []
+    }
+  }
+}
