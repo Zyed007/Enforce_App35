@@ -23,7 +23,7 @@ export default StyleSheet.create({
     flexDirection: "row",
   },
   titleText: {
-    color: Colors.white,
+    color: Colors.darkColor,
     fontSize: 20,
     fontWeight: "700",
   },
@@ -303,9 +303,9 @@ export default StyleSheet.create({
   },
   checkInText: {
     textAlign: "center",
-    fontSize: 17,
+    fontSize: 5,
     fontWeight: "600",
-    color: Colors.white,
+    color: "black",
     backgroundColor: "transparent",
   },
   
