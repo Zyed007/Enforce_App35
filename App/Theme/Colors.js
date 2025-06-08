@@ -15,5 +15,6 @@ export default {
   error: '#dc3545',
   lightGrey:'#D3D3D3',
   darkGrey:'#A9A9A9',
-  pinkBorder:'#F88A8A'
+  pinkBorder:'#F88A8A',
+  darkColor:"#3d322a",
 }

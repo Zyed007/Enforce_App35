@@ -96,7 +96,8 @@ const SwitchViewNew = ({
         <Text style={[styles.teamText, { color: "grey" }]}>Office / WFH</Text>
         <Switch
           value={isPlace}
-          color={"#229b6f"}
+            trackColor={{ false: "#ccc", true: "#ff9999" }}  // background/track color
+  thumbColor={isPlace ? "#fe717f" : "#f4f3f4"}  
           onValueChange={onChoosePlace}
         />
         <Text style={[styles.teamText, { color: "grey" }]}>Place</Text>
