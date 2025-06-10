@@ -83,7 +83,7 @@ export default class HomeScreen extends React.Component {
       isInRadiusModalShow: false,
       showAlertPopup: false,
       Mobile_ID: "",
-      UUID:"",
+      UUID: "",
       isForceCheckoutPopUp: false,
       isCheckOutPopup: false,
       locationFetcherNeeded: false,
@@ -146,7 +146,7 @@ export default class HomeScreen extends React.Component {
     this.lastCheckinByEmpID(true);
     this.geoCoder.initiaLizeGeoCoder();
     this.UUID = await getUUID()
-    console.log(UUID,"UUID which we need");
+    console.log(UUID, "UUID which we need");
     this._unsubscribe = this.props.navigation.addListener("blur", () => {
       if (this.locationFetcher != null) {
       }
@@ -470,19 +470,19 @@ export default class HomeScreen extends React.Component {
     console.log('Forcecehckoutfunction')
     console.log('post checkout', this.currentLocationObj)
     const value = await AsyncStorage.getItem("newNameKey")
-    console.log("Value",value);
+    console.log("Value", value);
     const userId = await getData(LocalDBItems.employeeDetails);
     const checkInDetails = await getData(LocalDBItems.CHECK_IN_OUT_DETAILS);
     let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
     this.setState({ loading: true });
-    if(value=='Forgot to Checkout'){
+    if (value == 'Forgot to Checkout') {
       const date = await AsyncStorage.getItem("forcetime")
       let formattedTime = moment().format("MM/DD/YYYY") + ' ' + date;
       console.log('IfformattedTime*******', formattedTime)
       let forceCheckoutTime = moment(formattedTime, "MM/DD/YYYY hh:mm:A").toDate();
       console.log(forceCheckoutTime, "forceCheckoutTime");
     }
-    else{
+    else {
       const date = moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A");
       let formattedTime = moment().format("MM/DD/YYYY") + ' ' + date;
       console.log('elseformattedTime*******', formattedTime)
@@ -496,7 +496,7 @@ export default class HomeScreen extends React.Component {
       check_out: this.forceCheckoutTime,
       is_inrange: checkIsInRadius ? checkIsInRadius : false,
       modifiedby: userId.full_name,
-      checkout_tag_id:this.UUID,
+      checkout_tag_id: this.UUID,
       is_app_check_In: true,
       check_out_method: isEndOfWork,
       TimesheetCurrentLocationViewModel: {
@@ -608,7 +608,7 @@ export default class HomeScreen extends React.Component {
         team_member_empid: this.checkInDataValue.empid,
         groupid: this.checkInDataValue.groupid,
         check_out: formattedTime,
-        checkout_tag_id:this.UUID,
+        checkout_tag_id: this.UUID,
         is_inrange: checkIsInRadius ? checkIsInRadius : false,
         modifiedby: userId.full_name,
         check_out_method: isEndOfWork,
@@ -866,7 +866,7 @@ export default class HomeScreen extends React.Component {
       check_out: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
       is_inrange: checkIsInRadius ? checkIsInRadius : false,
       modifiedby: userId.full_name,
-      checkout_tag_id:this.UUID,
+      checkout_tag_id: this.UUID,
       check_out_method: isEndOfWork,
       TimesheetCurrentLocationViewModel: {
         formatted_address: this.currentLocationObj.formatted_address,
@@ -883,7 +883,7 @@ export default class HomeScreen extends React.Component {
         country: this.currentLocationObj.country,
       },
     };
-    console.log(params),"UUID Errroe";
+    console.log(params), "UUID Errroe";
     await storeData(LocalDBItems.checkOutLocationInfo, this.currentLocationObj);
     const requestObj = {
       endpoint: BaseUrl.API_BASE_URL + Endpoint.TIMESHEET_CHECKOUT,
@@ -1168,23 +1168,27 @@ export default class HomeScreen extends React.Component {
       params: params,
     };
     const apiResponseData = await apiService(requestObj);
+    console.log("API Response Data:", apiResponseData); // ✅ Log response
     setTimeout(() => {
       this.setState({
         loading: false,
       });
       if (apiResponseData) {
         if (apiResponseData.length > 0) {
-          const date = moment(apiResponseData[0].check_in).format(
-            "MM/DD/YYYY hh:mm:ss A"
-          );
-          this.isCheckinForLocation = true;
-          const dateToStore = moment(apiResponseData[0].check_in).toDate();
-          storeData(LocalDBItems.checkInDate, dateToStore);
-          const difference = moment.duration(
-            moment(this.state.currentDate).diff(
-              moment(apiResponseData[0].check_in)
-            )
-          );
+
+          //updated code for fetching correct time of checkin for timer to show
+          const checkInTime = moment(apiResponseData[0].check_in, "M/D/YYYY hh:mm:ss A");
+          const date = checkInTime.format("MM/DD/YYYY hh:mm:ss A");
+          const dateToStore = checkInTime.toDate();
+
+          console.log("date", date);
+          console.log("dateToStore", dateToStore);
+
+          storeData(LocalDBItems.checkInDate, dateToStore); // persist to async storage
+
+          const now = moment(); // current time
+          const difference = moment.duration(now.diff(checkInTime));
+
           //difference of the expiry date-time given and current date-time
           var hours = parseInt(difference.asHours());
           var minutes = parseInt(difference.minutes());
@@ -1743,7 +1747,7 @@ export default class HomeScreen extends React.Component {
                 <Text style={{ fontSize: 14, color: "#aab3be", fontFamily: 'lucida grande' }}>
                   Break Time
                 </Text>
-                <Text style={{ fontSize: 12, marginTop: 10 }}>
+                <Text style={{ fontSize: 15, marginTop: 10 }}>
                   {this.state.stopWatchCounterBreakIn}
                 </Text>
               </View>

@@ -2942,26 +2942,41 @@ export default class CheckInScreen extends React.Component {
         />
           {this.state.isOffice && !this.state.isPlace && this.state.officeAddressPlace.length > 0 ? (
             <DropDownPicker
-            open={this.state.dropdownOpen}
-            value={this.state.selectedOfficeValue}
-            items={this.state.officeAddressPlace}
-            setOpen={(open) => this.setState({ dropdownOpen: open })}
-            setValue={(callback) => {
-              const value = callback(this.state.selectedOfficeValue);
-              const selectedItem = this.state.officeAddressPlace.find(item => item.value === value);
-              const index = this.state.officeAddressPlace.findIndex(item => item.value === value);
-              this.setState({ selectedOfficeValue: value });
-              this.onSelectOfficeLocation(selectedItem, index);
-            }}
-            setItems={(items) => this.setState({ officeAddressPlace: items })}
-            placeholder="Select office"
-            searchable={true}
-            searchPlaceholder="Search for office"
-            containerStyle={{ height: 80, marginHorizontal: 10 }}
-            style={[styles.dropDownContainer, { marginTop: 0, backgroundColor: 'lightgrey' }]}
-            dropDownContainerStyle={{ backgroundColor: "#fcfcfc", zIndex: 10000 }}
-            textStyle={{ fontSize: 16, color: "#000" }}
-          />
+  open={this.state.dropdownOpen}
+  value={this.state.selectedOfficeValue}
+  items={this.state.officeAddressPlace}
+  setOpen={(open) => this.setState({ dropdownOpen: open })}
+  setValue={(callback) => {
+    const value = callback(this.state.selectedOfficeValue);
+    const selectedItem = this.state.officeAddressPlace.find(item => item.value === value);
+    const index = this.state.officeAddressPlace.findIndex(item => item.value === value);
+    this.setState({ selectedOfficeValue: value });
+    this.onSelectOfficeLocation(selectedItem, index);
+  }}
+  setItems={(items) => this.setState({ officeAddressPlace: items })}
+  placeholder="Select office"
+  searchable={true}
+  searchPlaceholder="Search for office"
+  containerStyle={{
+    height: 60,
+    width: '90%',
+    alignSelf: 'center',
+    marginTop: 20,
+  }}
+  style={[
+    styles.dropDownContainer,
+    { marginTop: 5, backgroundColor: 'lightgrey' },
+  ]}
+  dropDownContainerStyle={{
+    backgroundColor: '#fcfcfc',
+    zIndex: 10000,
+  }}
+  textStyle={{
+    fontSize: 16,
+    color: '#000',
+  }}
+/>
+
           ) : (
             <LocationText
               locationName={this.getLocationName()}
@@ -3259,15 +3274,16 @@ export default class CheckInScreen extends React.Component {
             colors={this.getNavigationColor()}
           >
             <MaterialTabs
-              items={["Job", "Case", "Place"]}
-              selectedIndex={this.state.selectedTab}
-              onChange={(e) => this.setSelectedTab(e)}
-              uppercase={false}
-              textStyle={{ fontSize: 21, fontWeight: "700" }}
-              barColor="transparent"
-              indicatorColor="black"
-              activeTextColor="white"
-            />
+  items={["Job", "Case", "Place"]}
+  selectedIndex={this.state.selectedTab}
+  onChange={(e) => this.setSelectedTab(e)}
+  uppercase={false}
+  textStyle={{ fontSize: 21, fontWeight: "700" }}
+  barColor="transparent"
+  indicatorColor="black"
+  activeTextColor="#71797E	"         // Selected tab = white
+  inactiveTextColor="black"       // Unselected tabs = black
+/>
           </LinearGradient>
           <ScrollView
             contentContainerStyle={{ paddingBottom: 60 }}
