@@ -214,7 +214,6 @@ export default class ViewLiveTrackingScreen extends React.Component {
         "created_date": date,
         "is_trip_end": this.isTripEnd,
         "createdby": employeeDetails?.full_name, // This might need to be populated from employeeDetails
-        "is_trip_end": this.isTripEnd, // This value needs to be set externally (e.g., by a "End Trip" button)
         ...checkInDict // Spread checkInDict to include all its properties
       };
 

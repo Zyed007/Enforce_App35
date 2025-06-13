@@ -6,157 +6,170 @@ import {
   Dimensions,
   TouchableOpacity,
   Text,
+  Platform,
 } from "react-native";
 import MapView, {
   Marker,
   Polyline,
   PROVIDER_GOOGLE,
+  AnimatedRegion,
 } from "react-native-maps";
-import { Colors, Helpers, Images, Metrics } from "../Theme";
-import haversine from "haversine";
-import {
-  getData,
-  LocalDBItems,
-  storeData,
-  wipeData,
-} from "../Services/LocalStorage";
-import UtilityHelper from "./UtilityHelper";
+import { Colors, Images } from "../Theme";
+import { getData, LocalDBItems } from "../Services/LocalStorage";
 import Geolocation from "react-native-geolocation-service";
 import { getPathLength } from "geolib";
 import Icon from "react-native-vector-icons/FontAwesome5Pro";
 
 const windowWidth = Dimensions.get("window").width;
+const windowHeight = Dimensions.get("window").height;
 
 const LATITUDE_DELTA = 0.009;
 const LONGITUDE_DELTA = 0.009;
-const LATITUDE = 29.95539;
-const LONGITUDE = 78.07513;
+const DEFAULT_LATITUDE = 29.95539;
+const DEFAULT_LONGITUDE = 78.07513;
 
 export default class MapForPolyline extends React.Component {
   constructor(props) {
     super(props);
 
+    const initialCoordinate = {
+      latitude: DEFAULT_LATITUDE,
+      longitude: DEFAULT_LONGITUDE,
+    };
+
     this.state = {
-      latitude: LATITUDE,
-      longitude: LONGITUDE,
-      locationTrackingCOrindates: [],
+      latitude: initialCoordinate.latitude,
+      longitude: initialCoordinate.longitude,
       routeCoordinates: [],
       distanceTravelled: 0,
-      prevLatLng: {},
+      animatedCoordinate: new AnimatedRegion({
+        ...initialCoordinate,
+        latitudeDelta: LATITUDE_DELTA,
+        longitudeDelta: LONGITUDE_DELTA,
+      }),
       coordinate: {
-        latitude: LATITUDE,
-        longitude: LONGITUDE,
+        ...initialCoordinate,
         latitudeDelta: LATITUDE_DELTA,
         longitudeDelta: LONGITUDE_DELTA,
       },
     };
 
-    this.markekerCordinte = {
-      latitude: 9.947236,
-      longitude: 76.347843,
-    };
-
-    this.isInitialLoad = true;
+    this.map = null;
   }
 
   async componentDidMount() {
-    let locationArray = await getData(LocalDBItems.locationArrayForTracing);
-    if (locationArray && locationArray.length > 0) {
-      let location = locationArray[locationArray.length - 1];
-      this.trackLocationOnMap(location);
-    } else {
-      Geolocation.getCurrentPosition(
-        async (position) => {
-          let location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          };
-          this.trackLocationOnMap(location);
+    let storedLocationArray = await getData(LocalDBItems.locationArrayForTracing);
+
+    if (storedLocationArray && storedLocationArray.length > 0) {
+      const last = storedLocationArray[storedLocationArray.length - 1];
+      this.setState({
+        latitude: last.latitude,
+        longitude: last.longitude,
+        routeCoordinates: storedLocationArray,
+        distanceTravelled: getPathLength(storedLocationArray) / 1000,
+        animatedCoordinate: new AnimatedRegion({
+          ...last,
+          latitudeDelta: LATITUDE_DELTA,
+          longitudeDelta: LONGITUDE_DELTA,
+        }),
+        coordinate: {
+          ...last,
+          latitudeDelta: LATITUDE_DELTA,
+          longitudeDelta: LONGITUDE_DELTA,
         },
-        (error) => {
-          console.warn("Error getting current location:", error);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-      );
+      });
+    }
+
+    this.watchPosition();
+  }
+
+  componentWillUnmount() {
+    if (this.watchId != null) {
+      Geolocation.clearWatch(this.watchId);
     }
   }
 
-  trackLocationOnMap = async (location) => {
-    let updatedLocationArray = await getData(
-      LocalDBItems.locationArrayForTracing
-    );
+  watchPosition = () => {
+    this.watchId = Geolocation.watchPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        const newCoordinate = { latitude, longitude };
 
-    this.markekerCordinte = location;
+        let storedLocationArray = (await getData(LocalDBItems.locationArrayForTracing)) || [];
 
-    const distanceTravelledWithLocation =
-      getPathLength(updatedLocationArray) / 1000;
+        // Update path
+        const updatedRoute = [...storedLocationArray, newCoordinate];
 
-    this.setState(
-      {
-        latitude: location.latitude,
-        longitude: location.longitude,
-        routeCoordinates:
-          updatedLocationArray.length === 0 ? [location] : updatedLocationArray,
-        coordinate: location,
-        distanceTravelled: distanceTravelledWithLocation,
-        prevLatLng: location,
-      },
-      () => {
-        if (this.map && updatedLocationArray.length > 0) {
-          setTimeout(() => {
-            this.map.fitToCoordinates(updatedLocationArray, {
-              edgePadding: {
-                top: 20,
-                bottom: 20,
-                left: 20,
-                right: 20,
-              },
-              animated: true,
-            });
-          }, 100);
+        const distance = getPathLength(updatedRoute) / 1000;
+
+        // Animate marker coordinate update
+        this.state.animatedCoordinate.timing({
+          latitude: newCoordinate.latitude,
+          longitude: newCoordinate.longitude,
+          duration: 500,
+          useNativeDriver: false,
+        }).start();
+
+        this.setState({
+          latitude,
+          longitude,
+          routeCoordinates: updatedRoute,
+          distanceTravelled: distance,
+          coordinate: {
+            ...newCoordinate,
+            latitudeDelta: LATITUDE_DELTA,
+            longitudeDelta: LONGITUDE_DELTA,
+          },
+        });
+
+        if (this.map) {
+          this.map.animateToRegion(
+            {
+              ...newCoordinate,
+              latitudeDelta: LATITUDE_DELTA,
+              longitudeDelta: LONGITUDE_DELTA,
+            },
+            500
+          );
         }
+      },
+      (error) => console.warn(error),
+      {
+        enableHighAccuracy: true,
+        distanceFilter: 10,
+        interval: 5000,
+        fastestInterval: 2000,
+        showLocationDialog: true,
       }
     );
   };
 
-  onMapReady = () => {
-    const { routeCoordinates } = this.state;
-    if (routeCoordinates && routeCoordinates.length > 0) {
-      this.map.fitToCoordinates(routeCoordinates, {
-        edgePadding: {
-          top: 10,
-          right: 10,
-          bottom: 10,
-          left: 10,
-        },
-        animated: false,
-      });
-    }
-  };
-
   render() {
+    const { animatedCoordinate, routeCoordinates, distanceTravelled } = this.state;
+
+    // Use MapView.Animated for smooth animations
+    const AnimatedMapView = MapView.Animated;
+
     return (
       <View style={{ flex: 1 }}>
-        <MapView
-          ref={(map) => {
-            this.map = map;
+        <AnimatedMapView
+          ref={(ref) => {
+            this.map = ref;
           }}
           provider={PROVIDER_GOOGLE}
-          onMapReady={this.onMapReady}
-          showsUserLocation={true}
           style={{
-            height: this.props.height || 400,
+            height: this.props.height || windowHeight * 0.8,
             width: windowWidth,
             marginHorizontal: 10,
           }}
-          initialRegion={{
-            latitude: 25.2048,
-            longitude: 55.2708,
-            latitudeDelta: 0.0922,
-            longitudeDelta: 0.0421,
-          }}
+          region={this.state.coordinate}  // <-- changed here from initialRegion to region
+          showsUserLocation={false}
+          showsCompass={true}
+          zoomEnabled={true}
+          zoomControlEnabled={true}
+          showsMyLocationButton={true}
         >
-          {/* Marker for provided coordinate */}
+          {/* Static marker from props */}
           {this.props.coordinate && (
             <Marker
               coordinate={this.props.coordinate}
@@ -166,32 +179,32 @@ export default class MapForPolyline extends React.Component {
             </Marker>
           )}
 
-          {/* Marker for current or last known position */}
-          <Marker
-            coordinate={this.markekerCordinte}
+          {/* Animated current location marker */}
+          <Marker.Animated
+            coordinate={animatedCoordinate}
             anchor={{ x: 0.5, y: 0.5 }}
           >
             <Image
               source={Images.mapCurrentLocation}
               style={{ width: 40, height: 40 }}
             />
-          </Marker>
+          </Marker.Animated>
 
-          {/* Polyline for tracked route */}
-          {this.state.routeCoordinates.length > 0 && (
+          {/* Polyline route */}
+          {routeCoordinates.length > 0 && (
             <Polyline
-              coordinates={this.state.routeCoordinates}
+              coordinates={routeCoordinates}
               strokeColor="black"
               strokeWidth={2}
             />
           )}
-        </MapView>
+        </AnimatedMapView>
 
+        {/* Distance Covered Display */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={[styles.bubble, styles.button]}>
             <Text style={styles.bottomBarContent}>
-              Distance covered:{" "}
-              {parseFloat(this.state.distanceTravelled).toFixed(2)} km
+              Distance covered: {distanceTravelled.toFixed(2)} km
             </Text>
           </TouchableOpacity>
         </View>
@@ -209,7 +222,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   button: {
-    width: 80,
+    width: 140,
     paddingHorizontal: 12,
     alignItems: "center",
     marginHorizontal: 10,
