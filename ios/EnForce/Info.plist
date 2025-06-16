@@ -44,7 +44,7 @@
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>App requires background tracking</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string/>
+	<string>App requires your location while in use for tracking and safety features.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>EnForce</string>
 	<key>UIAppFonts</key>

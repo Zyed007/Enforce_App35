@@ -1,7 +1,6 @@
-platform :ios, '13.0'
+platform :ios, '16.0'
 
 require_relative '../node_modules/react-native/scripts/react_native_pods'
-# require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
 
 target 'EnForce' do
   config = use_native_modules!
@@ -14,16 +13,15 @@ target 'EnForce' do
   pod 'RNVectorIcons', :path => '../node_modules/react-native-vector-icons'
   pod 'RNSVG', :path => '../node_modules/react-native-svg'
 
-  permissions_path = '../node_modules/react-native-permissions/ios'
-  pod 'Permission-LocationAlways', :path => "#{permissions_path}/LocationAlways.podspec"
-  pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}/LocationWhenInUse.podspec"
-  pod 'Permission-Camera', :path => "#{permissions_path}/Camera.podspec"
+  # Permissions
+  pod 'RNPermissions', :path => '../node_modules/react-native-permissions'
 
+  # Maps
   rn_maps_path = '../node_modules/react-native-maps'
   pod 'react-native-maps', path: rn_maps_path
-  pod 'react-native-google-maps', path: rn_maps_path
   pod 'GoogleMaps'
 
+  # Camera (not to be confused with permissions)
   pod 'react-native-camera', path: '../node_modules/react-native-camera', subspecs: [
     'FaceDetectorMLKit'
   ]
