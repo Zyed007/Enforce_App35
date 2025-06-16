@@ -1,9 +1,12 @@
-platform :ios, '16.0'
+platform :ios, '17.0'
 
 require_relative '../node_modules/react-native/scripts/react_native_pods'
 
 target 'EnForce' do
   config = use_native_modules!
+
+  # Use static frameworks to resolve modular header issues
+  use_frameworks! :linkage => :static
 
   use_react_native!(
     path: "../node_modules/react-native",
@@ -18,15 +21,42 @@ target 'EnForce' do
 
   # Maps
   rn_maps_path = '../node_modules/react-native-maps'
-  pod 'react-native-maps', path: rn_maps_path
+  pod 'react-native-maps', path: rn_maps_path, :modular_headers => true
   pod 'GoogleMaps'
 
-  # Camera (not to be confused with permissions)
+  # Camera
   pod 'react-native-camera', path: '../node_modules/react-native-camera', subspecs: [
     'FaceDetectorMLKit'
-  ]
+  ], :modular_headers => true
+
+  # Firebase (if needed)
+  pod 'Firebase/Core'
+  pod 'Firebase/Auth'
 
   post_install do |installer|
     react_native_post_install(installer)
+    
+    # Fix for DoubleConversion and other common issues
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        # General build settings
+        config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+        config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+        
+        # Architecture settings
+        config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+        config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
+        
+        # React Native specific fixes
+        if target.name == 'React-Codegen'
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] = ['-DFOLLY_NO_CONFIG']
+        end
+        
+        # GoogleMaps specific fix
+        if target.name == 'GoogleMaps'
+          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
+        end
+      end
+    end
   end
 end
