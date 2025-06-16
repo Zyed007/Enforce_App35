@@ -1,42 +1,34 @@
-
-require_relative '../node_modules/react-native/scripts/react_native_pods'
-#require_relative '../node_modules/react-native/scripts/codegen_pods'
-
 platform :ios, '13.0'
 
+require_relative '../node_modules/react-native/scripts/react_native_pods'
+# require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
+
 target 'EnForce' do
-  config = use_react_native!(
-    :path => "../node_modules/react-native",
-    :hermes_enabled => true,
-    :fabric_enabled => false,
+  config = use_native_modules!
+
+  use_react_native!(
+    path: "../node_modules/react-native",
   )
 
-  #use_react_native_codegen!(config)
-
-  # Third-party libraries
+  # Additional manual pods
   pod 'RNVectorIcons', :path => '../node_modules/react-native-vector-icons'
   pod 'RNSVG', :path => '../node_modules/react-native-svg'
 
-  # Permissions
   permissions_path = '../node_modules/react-native-permissions/ios'
-  pod 'Permission-LocationAlways', :path => "#{permissions_path}"
-  pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}"
-  pod 'Permission-Camera', :path => "#{permissions_path}"
+  pod 'Permission-LocationAlways', :path => "#{permissions_path}/LocationAlways.podspec"
+  pod 'Permission-LocationWhenInUse', :path => "#{permissions_path}/LocationWhenInUse.podspec"
+  pod 'Permission-Camera', :path => "#{permissions_path}/Camera.podspec"
 
-  # Maps
   rn_maps_path = '../node_modules/react-native-maps'
   pod 'react-native-maps', path: rn_maps_path
   pod 'react-native-google-maps', path: rn_maps_path
   pod 'GoogleMaps'
 
-  # Camera
   pod 'react-native-camera', path: '../node_modules/react-native-camera', subspecs: [
     'FaceDetectorMLKit'
   ]
 
   post_install do |installer|
     react_native_post_install(installer)
-    __apply_Xcode_12_5_M1_post_install_workaround(installer)
   end
 end
-`
