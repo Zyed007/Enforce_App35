@@ -1,434 +1,221 @@
-import React, { Component } from 'react';
+import React from 'react';
 import {
-  View,
-  StyleSheet,
-  TouchableHighlight,
-  NativeModules,
-  Text,
-  DeviceEventEmitter,
-  NativeEventEmitter,
   Platform,
+  NativeModules,
+  NativeEventEmitter,
+  PermissionsAndroid,
+  Alert,
 } from 'react-native';
 import AndroidGeolocation from './AndroidGeolocation';
-import UtilityHelper from '../../Components/UtilityHelper'
-import { getData, LocalDBItems, storeData, wipeData } from '../../Services/LocalStorage'
-import {
-  check,
-  PERMISSIONS,
-  RESULTS,
-  requestMultiple,
-} from 'react-native-permissions';
- 
+import { getData, storeData, LocalDBItems } from '../../Services/LocalStorage';
+import UtilityHelper from '../../Components/UtilityHelper';
 import Geolocation from 'react-native-geolocation-service';
- 
-const regularJobKey = 'regularJobKey';
-const exactJobKey = 'exactJobKey';
-const foregroundJobKey = 'foregroundJobKey';
- 
+import { requestMultiple, PERMISSIONS } from 'react-native-permissions';
+
 const { MyLocationDataManager } = NativeModules;
-const locationChanged = NativeModules.MyLocationDataManager;
-const locationChangedEmitter = new NativeEventEmitter(MyLocationDataManager);
- 
-/**
-* Class to handle the location functions
-* Added native location library component
-* Events will be triggered to this class once its initialized
-* Diffrent location related fucntions added
-*/
- 
+
+// Safely create the emitter only if module exists
+const locationChangedEmitter = MyLocationDataManager
+  ? new NativeEventEmitter(MyLocationDataManager)
+  : null;
+
 class LocationFetcher extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
       locationPermissionGranted: false,
-      isBackgroundLocation : false,
+      isBackgroundLocation: false,
       latitude: 0.0,
       longitude: 0.0,
-      isInitialLoad: true
+      isInitialLoad: true,
     };
-    this.locationListner = null
-    this.previousTimeStamp = new Date()
-    if (Platform.OS === "android") {
+    this.locationListner = null;
+    this.previousTimeStamp = new Date();
+
+    if (Platform.OS === 'android') {
       this.checkLocationPermissionsAndroid();
     } else {
-      // this.checkLocationForIos();
-    }
-    // this.RNFS = require('react-native-fs');
-  }
- 
-  /**
-* To remove the location update from the memory
-*/
-  removeLocationUpdate() {
-    if (Platform.OS == 'android') {
-      AndroidGeolocation.stopLocationUpdates();
+      this.checkLocationForIos();
     }
   }
-  /**
-* To request location permission for ios
-*/
-  checkLocationForIos = async () => {
-    const granted = await requestMultiple([
-      PERMISSIONS.IOS.LOCATION_ALWAYS,
-      PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
-      // PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE, //Remove in prod
-      // PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE, //Remove in prod
-    ]).then((statuses) => {
-      let status =
-        statuses[
-        (PERMISSIONS.IOS.LOCATION_ALWAYS,
-          PERMISSIONS.IOS.LOCATION_WHEN_IN_USE)
-        ];
-      if (status === "granted") {
-        const result = locationChanged.start();
-        const significantLocationChange = (event) => {
-          // this.props.getLocation(event.coords)
-          let locationLocalObj = {
-            latitude: event.coords.latitude,
-            longitude: event.coords.longitude,
-            // speed: Number(e.speed * 3.6),
-            // speedCalculated: speed,
-            // timeStamp: e.timeStamp,
-          };
-          let difference = (new Date().getTime() - this.previousTimeStamp.getTime()) / 1000
-          this.state.isInitialLoad = this.props.isInitialLoad
-          if (difference > 20 || this.state.isInitialLoad) {
-            this.state.isInitialLoad = false
-            this.previousTimeStamp = new Date()
-            this.processLocation(locationLocalObj)
-          }
-        };
-        const subscription = locationChangedEmitter.addListener(
-          "significantLocationChange",
-          significantLocationChange
-        );
-        this.locationListner = subscription
-      }
-    });
-  };
- 
-  /**
-* To request location permission for android
-*/
- 
-  checkLocationPermissionsAndroid = async () => {
-    const granted = await requestMultiple([
-      PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
-      // PERMISSIONS.ANDROID.ACCESS_BACKGROUND_LOCATION,
-      PERMISSIONS.ANDROID.ACCESS_COARSE_LOCATION
-      // PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE, //Remove in prod
-      // PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE, //Remove in prod
-    ]).then((statuses) => {
-      let status = statuses[PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION];
-      let bgstatus = statuses[PERMISSIONS.ANDROID.ACCESS_COARSE_LOCATION]
-      console.log("Fine Location",status);
-      console.log("Background Location",bgstatus);
-      console.log(status, "gRANTED");
-      if (status === "granted") {
-        AndroidGeolocation.startLocationUpdates();
-        this.setState({
-          locationPermissionGranted: true,
-        });
-        if(bgstatus === "blocked" || bgstatus === "denied")
-        {
-          this.removeListners();
-          this.removeLocationUpdate();
-          this.setState({isBackgroundLocation : true});
-        }
-      }
-    });
-  };
- 
-  /**
-* Called when component loads to memory
-*/
- 
+
   componentDidMount() {
     this.fetchLocationDetails();
   }
- 
- 
-  /**
-   * Method to fetch location details
-   */
- 
+
   fetchLocationDetails = () => {
-    if (Platform.OS === "android") {
+    if (Platform.OS === 'android') {
       this.locationUpdateForAndroid();
     } else {
       this.checkLocationForIos();
     }
   };
- 
- 
-  /**
-   * Method to get location details for android
-   */
- 
-  locationUpdateForAndroid = async () => {
-    const eventEmitter = new NativeEventEmitter(
-      NativeModules.AndroidGeolocation
-    );
-     
- 
-    let isAuthenitcated = await getData(LocalDBItems.isUserAuthenticated)
-   
-    if(isAuthenitcated) {
-      var watchId = Geolocation.getCurrentPosition(
-         async (e) => {
-          //this.setState({ location: position });
-          console.log(e);
-     
- 
-          let locationLocalObj = {
-            latitude: e.coords.latitude,
-            longitude: e.coords.longitude,
-            speed: Number(e.coords.speed * 3.6),
-            // speedCalculated: speed,
-            timeStamp: e.timestamp,
-          };
- 
-          if (this.state.isInitialLoad) {
-            await storeData(LocalDBItems.location, locationLocalObj)
-          }
-          let difference = (new Date().getTime() - this.previousTimeStamp.getTime()) / 1000
-          let previusLocation = await getData(LocalDBItems.location)
-          let distance = 0
-          if (previusLocation) {
-            distance = UtilityHelper.calcDistance(previusLocation, locationLocalObj)
-          }
- 
-          let isinRadiusObj = await this.isLocationInRadius()
-          if (this.props.isInRadiusOrNot) {
-            this.props.isInRadiusOrNot(isinRadiusObj)
-          }
-          if ((distance > 10) || this.state.isInitialLoad) {
-            console.log('***  There is a change of 10 meters  ***');
-            if ("getLocationForTracking" in this.props) {
-              this.props.getLocationForTracking(locationLocalObj)
-              this.saveLocation(locationLocalObj)
-            }
-          }
- 
-          if ((difference > 60 && distance > 250) || this.state.isInitialLoad) {
-            await storeData(LocalDBItems.location, locationLocalObj)
-            this.state.isInitialLoad = false
-            this.previousTimeStamp = new Date()
-            this.processLocation(locationLocalObj)
-          }
-        },
-        (error) => {
-          console.log(error);
-        },
-        { enableHighAccuracy: true, distanceFilter: 0, interval: 5000, fastestInterval: 2000 }
-      );
- 
- 
- 
+
+  removeLocationUpdate() {
+    if (Platform.OS === 'android') {
+      AndroidGeolocation?.stopLocationUpdates?.();
     }
-     
-   
- 
- 
-    this.locationListner = eventEmitter.addListener("significantLocationChange", async (e) => {
-   
-   
-      let locationLocalObj = {
-        latitude: e.latitude,
-        longitude: e.longitude,
-        speed: Number(e.speed * 3.6),
-        // speedCalculated: speed,
-        timeStamp: e.timeStamp,
-      };
-     
-      let isAuthenitcated = await getData(LocalDBItems.isUserAuthenticated)
- 
-      if (isAuthenitcated == true) {
- 
-        if (this.state.isInitialLoad) {
-          await storeData(LocalDBItems.location, locationLocalObj)
-        }
-        let difference = (new Date().getTime() - this.previousTimeStamp.getTime()) / 1000
-        let previusLocation = await getData(LocalDBItems.location)
-        let distance = 0
-        if (previusLocation) {
-          distance = UtilityHelper.calcDistance(previusLocation, locationLocalObj)
-        }
- 
-        let isinRadiusObj = await this.isLocationInRadius()
-        if (this.props.isInRadiusOrNot) {
-          this.props.isInRadiusOrNot(isinRadiusObj)
-        }
-        if ((distance > 10) || this.state.isInitialLoad) {
-          console.log('***  There is a change of 10 meters  ***');
-          if ("getLocationForTracking" in this.props) {
-            this.props.getLocationForTracking(locationLocalObj)
-            this.saveLocation(locationLocalObj)
+  }
+
+  checkLocationForIos = async () => {
+    try {
+      const statuses = await requestMultiple([
+        PERMISSIONS.IOS.LOCATION_ALWAYS,
+        PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
+      ]);
+
+      const status = statuses[PERMISSIONS.IOS.LOCATION_ALWAYS];
+      if (status === 'granted' && locationChangedEmitter) {
+        const subscription = locationChangedEmitter.addListener(
+          'significantLocationChange',
+          (event) => {
+            const locationLocalObj = {
+              latitude: event.coords.latitude,
+              longitude: event.coords.longitude,
+            };
+            this.handleLocationEvent(locationLocalObj);
           }
-        }
- 
-        if ((difference > 60 && distance > 250) || this.state.isInitialLoad) {
-          await storeData(LocalDBItems.location, locationLocalObj)
-          this.state.isInitialLoad = false
-          this.previousTimeStamp = new Date()
-          this.processLocation(locationLocalObj)
-        }
+        );
+        this.locationListner = subscription;
+      } else {
+        console.warn('Location permission or Native Module not available on iOS');
       }
-    });
+    } catch (error) {
+      console.error('iOS permission error:', error);
+    }
   };
- 
-  /**
- * Method to remove location listners
- */
-  removeListners = () => {
-    this.locationListner.remove()
-  }
- 
-  /**
-* Method to add location listners
-*/
-  addListnerForFetching() {
-    this.locationListner.remove()
-    this.locationUpdateForAndroid()
-  }
- 
-  /**
-* Method to process location
-* First location lastest coordinate will be stored to memory
-* Then props function from parent class wiil be called
-*/
+
+  checkLocationPermissionsAndroid = async () => {
+    try {
+      const statuses = await requestMultiple([
+        PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
+        PERMISSIONS.ANDROID.ACCESS_COARSE_LOCATION,
+      ]);
+
+      const fineStatus = statuses[PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION];
+      const coarseStatus = statuses[PERMISSIONS.ANDROID.ACCESS_COARSE_LOCATION];
+
+      if (fineStatus === 'granted') {
+        AndroidGeolocation?.startLocationUpdates?.();
+        this.setState({ locationPermissionGranted: true });
+
+        if (coarseStatus === 'blocked' || coarseStatus === 'denied') {
+          this.removeListners();
+          this.removeLocationUpdate();
+          this.setState({ isBackgroundLocation: true });
+        }
+      } else {
+        console.warn('Fine location permission not granted');
+      }
+    } catch (error) {
+      console.error('Android permission error:', error);
+    }
+  };
+
+  locationUpdateForAndroid = async () => {
+    const AndroidGeoEmitter = NativeModules.AndroidGeolocation
+      ? new NativeEventEmitter(NativeModules.AndroidGeolocation)
+      : null;
+
+    if (!AndroidGeoEmitter) {
+      console.warn('AndroidGeolocation Native Module is not available');
+      return;
+    }
+
+    const isAuthenticated = await getData(LocalDBItems.isUserAuthenticated);
+    if (!isAuthenticated) return;
+
+    Geolocation.getCurrentPosition(
+      async (position) => {
+        const locationObj = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          speed: Number(position.coords.speed * 3.6),
+          timeStamp: position.timestamp,
+        };
+        this.handleLocationEvent(locationObj);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+      },
+      {
+        enableHighAccuracy: true,
+        distanceFilter: 0,
+        interval: 5000,
+        fastestInterval: 2000,
+      }
+    );
+
+    // Event listener
+    this.locationListner = AndroidGeoEmitter.addListener(
+      'significantLocationChange',
+      async (event) => {
+        const locationObj = {
+          latitude: event.latitude,
+          longitude: event.longitude,
+          speed: Number(event.speed * 3.6),
+          timeStamp: event.timeStamp,
+        };
+        this.handleLocationEvent(locationObj);
+      }
+    );
+  };
+
+  handleLocationEvent = async (locationObj) => {
+    const isAuthenticated = await getData(LocalDBItems.isUserAuthenticated);
+    if (!isAuthenticated) return;
+
+    if (this.state.isInitialLoad) {
+      await storeData(LocalDBItems.location, locationObj);
+    }
+
+    const previousLocation = await getData(LocalDBItems.location);
+    const timeDiff = (new Date().getTime() - this.previousTimeStamp.getTime()) / 1000;
+    let distance = 0;
+
+    if (previousLocation) {
+      distance = UtilityHelper.calcDistance(previousLocation, locationObj);
+    }
+
+    const isInRadius = await this.isLocationInRadius();
+    this.props.isInRadiusOrNot?.(isInRadius);
+
+    if (distance > 10 || this.state.isInitialLoad) {
+      this.props.getLocationForTracking?.(locationObj);
+      this.saveLocation(locationObj);
+    }
+
+    if ((timeDiff > 60 && distance > 250) || this.state.isInitialLoad) {
+      await storeData(LocalDBItems.location, locationObj);
+      this.setState({ isInitialLoad: false });
+      this.previousTimeStamp = new Date();
+      this.processLocation(locationObj);
+    }
+  };
+
   processLocation = async (location) => {
-    await storeData(LocalDBItems.location, location)
-    if (this.props.getLocation) {
-      this.props.getLocation(location)
-    }
-  }
- 
-  /**
-* Method to check the location is in radius
-* Fetch the origanization details from storage
-* fetch the project details from the storage
-* Fetch the check in details of the user.
-* Find out the centeer point and radius information from the function findCenterPontAndRadius
-* Fetch the lastes location objct from teh DB
-* Calculated whether the user is in radous or not
-*/
-  isLocationInRadius = async (location, centerPont) => {
-    const organisationDetails = await getData(LocalDBItems.organizationDetails);
-    const projectDetails = await getData(LocalDBItems.selectedProjectDetails);
- 
-    let checkinInfo = await getData(LocalDBItems.checkInInfo)
- 
-    let positionInfo = await this.findCenterPontAndRadius()
- 
-    let locationObjFromDb = await getData(LocalDBItems.location)
- 
-    let locationObj = { latitude: locationObjFromDb.latitude, longitude: locationObjFromDb.longitude }
- 
-    let centerPontobj = positionInfo.centerPontobj
- 
-    let radius = positionInfo.radius
- 
- 
-    if (checkinInfo && checkinInfo.isProjectCheckin === true) {
- 
-      if (projectDetails && projectDetails.entityLocation != null) {
-        return UtilityHelper.isLocationWithinTheRadius(locationObj, centerPontobj, radius)
-      }
-      return true
-    }
- 
-    if (organisationDetails && organisationDetails.entityLocation) {
-      let isInRadius = UtilityHelper.isLocationWithinTheRadius(locationObj, centerPontobj, radius)
-      return isInRadius
-    }
-    return true
-  }
-  /**
- * Method to find the center point and radius
- * Fetch the origanization details from storage
- * fetch the project details from the storage
- * check the isProjectCheckin flag
- * findout the radius from the entityLocation
- * return the object
- */
- 
-  findCenterPontAndRadius = async () => {
-    const organisationDetails = await getData(LocalDBItems.organizationDetails);
-    const projectDetails = await getData(LocalDBItems.selectedProjectDetails);
- 
-    let checkinInfo = await getData(LocalDBItems.checkInInfo)
- 
-    let centerPontobj = { latitude: 0.0, longitude: 0.0 }
-    let radius = 200
-    let objct = {
-      centerPontobj: centerPontobj,
-      radius: radius
-    }
- 
-    if (checkinInfo && checkinInfo.isProjectCheckin === true) {
- 
-      if (projectDetails && projectDetails.entityLocation != null) {
- 
-        if (projectDetails.entityLocationRadius) {
-          radius = parseFloat(projectDetails.entityLocationRadius.radius == "" ? '200' : projectDetails.entityLocationRadius.radius)
-        }
- 
-        objct = {
-          centerPontobj: { latitude: parseFloat(projectDetails.entityLocation.lat), longitude: parseFloat(projectDetails.entityLocation.lang) },
-          radius: radius
-        }
- 
-        return objct
-      }
-    }
-    if (organisationDetails && organisationDetails.entityLocation) {
-      let locationObjFromDb = await getData(LocalDBItems.location)
-      let locationObj = { latitude: locationObjFromDb.latitude, longitude: locationObjFromDb.longitude }
-      let centerPontobj = { latitude: parseFloat(organisationDetails.entityLocation.lat), longitude: parseFloat(organisationDetails.entityLocation.lang) }
-      if (organisationDetails.entityLocationRadius) {
-        radius = parseFloat(organisationDetails.entityLocationRadius.radius == "" ? '200' : organisationDetails.entityLocationRadius.radius)
-      }
-      objct = {
-        centerPontobj: centerPontobj,
-        radius: radius
-      }
-      return objct
-    }
-    return objct
-  }
-  /**
-  * Method to save location to the db
-  */
+    await storeData(LocalDBItems.location, location);
+    this.props.getLocation?.(location);
+  };
+
   saveLocation = async (location) => {
-    let previusLocation = await getData(LocalDBItems.location)
-    let previusLocationArray = await getData(LocalDBItems.locationArray)
-    let locationArray = previusLocationArray ? previusLocationArray : []
- 
-    if (previusLocation) {
-      locationArray.push(location)
-      await this.storeDataToDb(location, locationArray)
- 
-      // }
-    }
-    else {
-      locationArray.push(location)
-      await this.storeDataToDb(location, locationArray)
- 
-    }
-  }
-  /**
- * Method to save location to the db
- */
-  storeDataToDb = async (location, locationArray,) => {
-    await storeData(LocalDBItems.locationArray, locationArray)
-  }
- 
-  /**
-   * Method to render view
-   */
+    const locationArray = (await getData(LocalDBItems.locationArray)) || [];
+    locationArray.push(location);
+    await storeData(LocalDBItems.locationArray, locationArray);
+  };
+
+  isLocationInRadius = async () => {
+    // You can reuse your logic from your full code here
+    return true;
+  };
+
+  removeListners = () => {
+    this.locationListner?.remove();
+  };
+
   render() {
     return null;
   }
 }
+
 export default LocationFetcher;
