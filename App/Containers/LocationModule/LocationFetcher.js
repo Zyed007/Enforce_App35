@@ -219,4 +219,3 @@ class LocationFetcher extends React.Component {
 }
 
 export default LocationFetcher;
-//------------
