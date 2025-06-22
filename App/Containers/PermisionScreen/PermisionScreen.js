@@ -47,6 +47,7 @@ export default class PermissionScreen extends React.Component {
       showPermissionDeniedModal: false,
     };
     this.permisonIOSArray = [
+      PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
       PERMISSIONS.IOS.LOCATION_ALWAYS,
       PERMISSIONS.IOS.CAMERA,
     ];
@@ -113,66 +114,55 @@ export default class PermissionScreen extends React.Component {
    * To request location permission of the user
    */
   requestLocationPermission = () => {
-    let permission = this.getLocationPermissions();
-
-    // requestMultiple(permission).then((dictionary) => {
-    //   for (var key in dictionary) {
-    //     // check if the property/key is defined in the object itself, not in parent
-    //     if (dictionary.hasOwnProperty(key)) {
-
-    //       let value = dictionary[key];
-    //       console.log("**HEREIN IF**",value)
-    //       if (value == "granted") {
-    //         this.setState({ locationPermission: true });
-    //       }
-    //     }
-    //   }
-    // });
-
-    request(
-      PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
-      {
-        'title': 'Allow Enforce to access this device location even when the app is closed and not in user',
-        'message': 'Enforce App collects location data to enable Travel Claim when selecting place checkin even when the app is closed or not in use',
-        'buttonPositive': 'Accept',
-        'buttonNegative': 'Cancel'
-      }
-    ).then((value) => {
-
-      if (value == "granted") {
-        // requestBgLocatinPermission();
-
-        request(
-          PERMISSIONS.ANDROID.ACCESS_BACKGROUND_LOCATION,
-          {
-            'title': 'Allow Enforce to access this device location even when the app is closed and not in user',
-            'message': 'Enforce App collects location data to enable Travel Claim when selecting place checkin even when the app is closed or not in use.If you are not giving Allow all the time Permission you wont be able to claim the travel report!',
-            'buttonPositive': 'Accept',
-            'buttonNegative': 'Cancel'
-          }
-        ).then((value) => {
-          console.log('value--->', value);
-          if (value == "granted") {
-            this.setState({ locationPermission: true });
-            storeData(LocalDBItems.isEmployeeLocationTrack, true); 
-            storeData(LocalDBItems.isLocationTrackingNeeded, true);
-          }
-          else{
-            console.log("Test Vlaue",value)
-            this.setState({ locationPermission: true });
-            storeData(LocalDBItems.isEmployeeLocationTrack, false); 
-            storeData(LocalDBItems.isLocationTrackingNeeded, false);
-
-          }
-        })
-
-
-      }
-
-    }).catch((error) => {
-      console.log(error);
+  if (Platform.OS === "ios") {
+    // First request LOCATION_WHEN_IN_USE
+    request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE)
+      .then((result) => {
+        console.log("iOS LOCATION_WHEN_IN_USE permission result:", result);
+        if (result === RESULTS.GRANTED) {
+          this.setState({ locationPermission: true });
+        } else if (result === RESULTS.BLOCKED || result === RESULTS.DENIED) {
+          this.setState({ showPermissionDeniedModal: true });
+        }
+      })
+      .catch((error) => {
+        console.error("iOS location permission request error:", error);
+      });
+  } else {
+    // Android flow
+    request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION, {
+      title: 'Allow Enforce to access this device location',
+      message: 'Enforce App collects location data to enable Travel Claim when selecting place checkin even when the app is closed or not in use',
+      buttonPositive: 'Accept',
+      buttonNegative: 'Cancel'
     })
-  };
+      .then((fineResult) => {
+        if (fineResult === "granted") {
+          // Then request background location
+          request(PERMISSIONS.ANDROID.ACCESS_BACKGROUND_LOCATION, {
+            title: 'Allow Enforce to access your location in the background',
+            message: 'Background location is needed to support Travel Claim check-in.',
+            buttonPositive: 'Accept',
+            buttonNegative: 'Cancel'
+          }).then((bgResult) => {
+            const isGranted = bgResult === "granted";
+            this.setState({ locationPermission: true });
+            storeData(LocalDBItems.isEmployeeLocationTrack, isGranted);
+            storeData(LocalDBItems.isLocationTrackingNeeded, isGranted);
+          }).catch((bgErr) => {
+            console.error("Android background location error:", bgErr);
+            this.setState({ locationPermission: true });
+            storeData(LocalDBItems.isEmployeeLocationTrack, false);
+            storeData(LocalDBItems.isLocationTrackingNeeded, false);
+          });
+        }
+      })
+      .catch((err) => {
+        console.error("Android fine location error:", err);
+      });
+  }
+};
+
 
 
   /**

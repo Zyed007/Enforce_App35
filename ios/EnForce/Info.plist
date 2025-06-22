@@ -31,8 +31,6 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
@@ -49,11 +47,18 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
-	
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera...</string>
 
-  <key>NSCameraUsageDescription</key>
-  <string>We need access to your camera so you can take and upload your picture for your attendance confirmation</string>
-  <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-  <string>We need access of your location so that you can checkin at office location</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs access to your location to show nearby features.</string>
+
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>This app needs access to your location even when in background.</string>
+
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+<string>This app needs location access in all cases for full functionality.</string>
+
+
 </dict>
 </plist>
