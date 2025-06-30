@@ -47,18 +47,19 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+
+	<key>UIBackgroundModes</key>
+<array>
+  <string>location</string>
+</array>
 	<key>NSCameraUsageDescription</key>
 	<string>We need access to your camera...</string>
 
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs access to your location to show nearby features.</string>
-
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>This app needs access to your location even when in background.</string>
-
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-<string>This app needs location access in all cases for full functionality.</string>
-
-
+    <string>This app needs location access in all cases for full functionality.</string>
 </dict>
 </plist>

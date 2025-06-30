@@ -2,29 +2,40 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export const storeData = async (key, value) => {
   try {
-    const jsonValue = JSON.stringify(value)
-    await AsyncStorage.setItem(key, jsonValue)
+    if (value === null || value === undefined) {
+      console.warn(`Attempting to store null/undefined for key: ${key}`);
+      return;
+    }
+    const jsonValue = JSON.stringify(value);
+    await AsyncStorage.setItem(key, jsonValue);
   } catch (e) {
-    // eslint-disable-next-line no-console
+    console.error(`Error storing data for key ${key}:`, e);
+    throw e; // Re-throw to handle in calling code
   }
-}
+};
 
 export const wipeData = async () => {
   try {
     await AsyncStorage.clear();
   } catch (e) {
+    console.error('Error wiping data:', e);
+    throw e;
   }
-}
+};
 
 export const getData = async (key) => {
   try {
-    const jsonValue = await AsyncStorage.getItem(key)
-    return jsonValue != null ? JSON.parse(jsonValue) : null
+    const jsonValue = await AsyncStorage.getItem(key);
+    if (jsonValue === null) {
+      console.log(`No data found for key: ${key}`);
+      return null;
+    }
+    return JSON.parse(jsonValue);
   } catch (e) {
-    // error reading value
-    // eslint-disable-next-line no-console
+    console.error(`Error getting data for key ${key}:`, e);
+    throw e;
   }
-}
+};
 
 export const LocalDBItems = {
   baseUrl: 'BASE_URL',
@@ -51,5 +62,6 @@ export const LocalDBItems = {
   selectedProjectDetails:"SELECTED_PROJECT_DETAILS",
   CHECK_IN_OUT_DETAILS:  "CHECK_IN_OUT_DETAILS",
   offlineTrackingData: 'OFFLINE_TRACKING_DATA',  // <--- add this!
+  officeLocation: 'OFFICE_LOCATION',
   
 }

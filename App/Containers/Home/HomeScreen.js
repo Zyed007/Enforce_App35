@@ -436,13 +436,47 @@ export default class HomeScreen extends React.Component {
   /**
    * Navigate to check in screen
    */
-  navigateToCheckInScreen = async () => {
-    NavigationService.navigate("CheckInScreen", {
-      onGoBack: () => this.refresh(),
-      locationDetails: this.state.locationDetails,
-      cordinateObj: this.cordinateObj,
-    });
-  };
+ navigateToCheckInScreen = async () => {
+  try {
+    // Get current location first
+    const location = await this.getCurrentLocation();
+    
+    if (location) {
+      console.log("Navigating to CheckInScreen with:", location);
+      NavigationService.navigate("CheckInScreen", {
+  locationDetails: location.formatted_address || "Current Location",
+  cordinateObj: {
+    latitude: location.latitude,
+    longitude: location.longitude
+  },
+});
+    } else {
+      Alert.alert("Error", "Could not get current location");
+    }
+  } catch (error) {
+    console.error("Navigation error:", error);
+    Alert.alert("Error", "Failed to navigate to check-in screen");
+  }
+};
+
+getCurrentLocation = () => {
+  return new Promise((resolve) => {
+    Geolocation.getCurrentPosition(
+      position => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          formatted_address: "Current Location"
+        });
+      },
+      error => {
+        console.error(error);
+        resolve(null);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    );
+  });
+};
 
   location_feching = async () => {
     Geolocation.getCurrentPosition(location_info => this.location_value = location_info)

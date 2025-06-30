@@ -3,8 +3,8 @@ import { Platform } from "react-native";
 
 const permissionsIOSArray = [
   PERMISSIONS.IOS.CAMERA,
-  PERMISSIONS.IOS.LOCATION_ALWAYS,
   PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
+  PERMISSIONS.IOS.LOCATION_ALWAYS,
 ];
 const permissionsAndroidArray = [
   PERMISSIONS.ANDROID.CAMERA,
@@ -65,8 +65,8 @@ export async function isLocationPermisonGranted() {
   let isGranted = false;
   if (Platform.OS == "ios") {
     permissionsArray = [
+       PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
       PERMISSIONS.IOS.LOCATION_ALWAYS,
-      PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
     ];
   }
   if (Platform.OS == "android") {

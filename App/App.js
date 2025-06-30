@@ -16,17 +16,17 @@ import { getUUID, handleGenerateUUID } from './helper';
 const errorHandler = (e, isFatal) => {
   if (isFatal) {
     Alert.alert(
-        'Unexpected error occurred',
+        'Unexpected error Occurred',
         `
         Error: ${(isFatal) ? 'Fatal:' : ''} ${e.name} ${e.message}
-        We have reported this to our team ! Please close the app and start again!
+        We will not report this to our team ! Please close the app and start again!
         `,
       [{
         text: 'Close'
       }]
     );
   } else {
-    console.log(e); // So that we can see it in the ADB logs in case of Android if needed
+    console.log("ERROR OCCURED DUE TO",e); // So that we can see it in the ADB logs in case of Android if needed
   }
 };
 

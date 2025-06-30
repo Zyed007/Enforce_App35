@@ -52,6 +52,7 @@ import * as Progress from 'react-native-progress';
 import LocationError from "../../../Components/LocationError"
 import ImagePicker from 'react-native-image-crop-picker'
 import { getUUID } from "../../../helper";
+import {check, request, PERMISSIONS, RESULTS} from 'react-native-permissions';
 
 
 const windowWidth = Dimensions.get("window").width;
@@ -70,6 +71,16 @@ var faceimage;
 export default class CheckInScreen extends React.Component {
   constructor(props) {
     super(props);
+
+     const initialLocation = props.route.params?.locationDetails || {
+    formatted_address: '',
+    latitude: 0,
+    longitude: 0
+  };
+
+    
+
+
     this.state = {
       progress: 0,
       timer_error: true,
@@ -147,6 +158,7 @@ export default class CheckInScreen extends React.Component {
       isViewDecription: false,
       isLoading: true,
       faceReportPopup: false,
+      locationName: initialLocation.formatted_address,
 
     };
     this.modalizeRef = React.createRef();
@@ -184,36 +196,169 @@ export default class CheckInScreen extends React.Component {
     this.isAllowtocheckin = false;
   }
 
-  async componentDidMount() {
-    counter_face_data=0
-    const { navigation } = this.props;
-    var locationObj = this.props.route.params.cordinateObj;
+  // Modify componentDidMount to properly handle iOS permissions
+async componentDidMount() {
+  try {
+    counter_face_data = 0;
+    
+    // Initialize with default location values
+    this.currentLocationObj = {
+      formatted_address: 'Current Location',
+      latitude: 0,
+      longitude: 0,
+      street_number: '',
+      route: '',
+      locality: '',
+      administrative_area_level_2: '',
+      administrative_area_level_1: '',
+      postal_code: '',
+      country: ''
+    };
 
-    if (locationObj) {
-      this.cordinateObj.latitude = locationObj.latitude;
-      this.cordinateObj.longitude = locationObj.longitude;
-      // console.log(locationObj);
+    // 1. Initialize with passed location data if available
+    const { cordinateObj, locationDetails } = this.props.route.params || {};
+    if (cordinateObj && locationDetails) {
+      console.log('[Location] Initializing with passed location:', {
+        lat: cordinateObj.latitude,
+        lng: cordinateObj.longitude,
+        address: locationDetails.formatted_address
+      });
+
+      this.cordinateObj = {
+        latitude: cordinateObj.latitude,
+        longitude: cordinateObj.longitude
+      };
+
+      this.currentLocationObj = {
+        ...this.currentLocationObj,
+        formatted_address: locationDetails.formatted_address || 'Current Location',
+        latitude: cordinateObj.latitude,
+        longitude: cordinateObj.longitude
+      };
+
+      this.setState({
+        locationName: locationDetails.formatted_address || 'Current Location',
+        isInitialLoad: false
+      });
     }
-    this.getEmployeeDetails();
-    this.fetchAllProjectByOrgID();
+
+    // 2. iOS-specific location handling
+    if (Platform.OS === 'ios') {
+      try {
+        console.log('[iOS] Checking location permissions...');
+        const status = await check(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
+        
+        if (status !== RESULTS.GRANTED) {
+          console.log('[iOS] Requesting location permissions...');
+          const newStatus = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
+          
+          if (newStatus !== RESULTS.GRANTED) {
+            console.warn('[iOS] Location permission denied');
+            Alert.alert(
+              'Permission Required',
+              'Location access is needed for check-in functionality'
+            );
+            
+            // Even without permission, use passed location if available
+            if (cordinateObj) {
+              console.log('[iOS] Falling back to passed location due to permission denial');
+              this.currentLocationObj = {
+                ...this.currentLocationObj,
+                latitude: cordinateObj.latitude,
+                longitude: cordinateObj.longitude
+              };
+            }
+          }
+        }
+
+        // Set timeout for iOS location validation
+        this.locationTimeout = setTimeout(() => {
+          console.log('[iOS] Location validation timeout reached');
+          if (!this.hasValidLocation()) {
+            console.warn('[iOS] Location validation failed after timeout');
+            if (cordinateObj) {
+              console.log('[iOS] Using fallback location coordinates');
+              this.currentLocationObj = {
+                ...this.currentLocationObj,
+                latitude: cordinateObj.latitude,
+                longitude: cordinateObj.longitude
+              };
+            } else {
+              Alert.alert(
+                'Location Error', 
+                'Could not determine your current location'
+              );
+            }
+          }
+        }, 3000); // 3 second timeout
+      } catch (error) {
+        console.error('[iOS] Location permission error:', error);
+        // Fallback to passed location if available
+        if (cordinateObj) {
+          this.currentLocationObj = {
+            ...this.currentLocationObj,
+            latitude: cordinateObj.latitude,
+            longitude: cordinateObj.longitude
+          };
+        }
+      }
+    }
+
+    // 3. Load essential data with validation
+    console.log('[Init] Loading employee details...');
+    const empDetails = await this.getEmployeeDetails();
+    if (!empDetails) {
+      throw new Error('Failed to load employee details');
+    }
+    console.log('[Init] Employee details loaded successfully');
+
+    console.log('[Init] Fetching project data...');
+    await this.fetchAllProjectByOrgID();
+    
+    console.log('[Init] Initializing geocoder...');
     this.geoCoder.initiaLizeGeoCoder();
-    this.UUID = await getUUID()
-    // this.submitReport();
+    
+    console.log('[Init] Getting UUID...');
+    this.UUID = await getUUID();
+    
+    console.log('[Init] Starting error timer...');
     this.errortimer();
 
+    // 4. Set up navigation listener
     this._unsubscribe = this.props.navigation.addListener("blur", () => {
-      if (this.locationFetcher != null) {
+      console.log('[Cleanup] Removing location listeners...');
+      if (this.locationFetcher) {
         this.locationFetcher.removeListners();
-        this.locationFetcher = null;
       }
-      this.state.isLocationFetcherRequired = false;
+      if (this.locationTimeout) {
+        clearTimeout(this.locationTimeout);
+      }
     });
-    console.log("Am here Version", version.version);
 
-    const checkinInfo = { isOfficeChecin: false, isProjectCheckin: false };
-    storeData(LocalDBItems.checkInInfo, checkinInfo);
-    // this.animate();
+    console.log('[Init] CheckInScreen mounted successfully');
+    console.log('[Init] Current location state:', {
+      coords: this.cordinateObj,
+      address: this.currentLocationObj.formatted_address,
+      isInitialLoad: this.state.isInitialLoad
+    });
+
+  } catch (error) {
+    console.error('[Init] Initialization failed:', error);
+    Alert.alert(
+      'Initialization Error',
+      'Failed to initialize check-in. Please try again.'
+    );
+    this.props.navigation.goBack();
   }
+}
+
+// Helper method to validate location
+hasValidLocation = () => {
+  return this.currentLocationObj.latitude !== 0 && 
+         this.currentLocationObj.longitude !== 0 &&
+         this.currentLocationObj.latitude !== undefined &&
+         this.currentLocationObj.longitude !== undefined;
+};
 
   // animate() {
   //   let progress = 0;
@@ -240,12 +385,22 @@ export default class CheckInScreen extends React.Component {
   /**
    * Get employee details
    */
-  getEmployeeDetails = async () => {
+getEmployeeDetails = async () => {
+  try {
     const employeeDetails = await getData(LocalDBItems.employeeDetails);
+    if (!employeeDetails) {
+      throw new Error("Employee details not found");
+    }
     this.employeeDetails = { ...employeeDetails, isFaceVerified: false };
     this.timer_error = true;
-
-  };
+    return employeeDetails;
+  } catch (error) {
+    console.error("Error fetching employee details:", error);
+    Alert.alert("Error", "Failed to load employee details");
+    this.props.navigation.goBack();
+    return null;
+  }
+};
 
 
   /* For starting the timer and for the retry option, For the error stimulation we can change the timer to a lower value */
@@ -253,7 +408,7 @@ export default class CheckInScreen extends React.Component {
     setTimeout(() => {
       if (this.timer_error == false || this.currentLocationObj != "") {
         console.log("Timer_Error", this.timer_error)
-        console.log("Tim", counter)
+        console.log("Time", counter)
         return;
       }
       else {
@@ -261,7 +416,7 @@ export default class CheckInScreen extends React.Component {
           this.setState({ isLocationError: true, isLocationverification: true })
         }
         else {
-          console.log("Stucke")
+          console.log("Stuck")
           this.setState({ isLocationError: true })
           this.setState({ isLocationverification: false })
         }
@@ -547,50 +702,68 @@ export default class CheckInScreen extends React.Component {
    * Verify face and show timer
    * @returns
    */
-  verifyFaceRekcongition = async () => {
-    this.timer_error = false;
-    // this.facetimeerror();
-    // this.getLocationName();
-    console.log("on", this.currentLocationObj)
-    console.log(this.isAllowtocheckin, "aloow checkin");
-    console.log(this.state.isOffice, "is Office");
-    if (this.state.isForceCheckIn == false) {
-      if (this.state.isOffice) {
-        await this.onChoosePlaceOffice(true);
-      }
-      if (this.isAllowtocheckin == false && this.state.isOffice) {
-        Alert.alert(
-          "Office",
-          "Your current location isn't matched with the office location"
-        );
-        return;
-      }
-    }
-    if (this.state.isWorkFromHome && this.currentLocationObj.formatted_address == "") {
+verifyFaceRekcongition = async () => {
+  console.log('[CheckIn] Starting verification process...');
+  
+  try {
+    // 1. Validate we have proper location data
+    if (!this.hasValidLocation()) {
+      console.warn('[CheckIn] Invalid location data');
       Alert.alert(
-        "Work from home",
-        "Unable to fetch current location"
+        'Location Error',
+        'Valid location is required for check-in'
       );
       return;
     }
 
-    if (this.state.isManual && this.currentLocationObj.formatted_address === "") {
+    // 2. For office check-ins, verify radius
+    if (this.state.isOffice) {
+      console.log('[CheckIn] Verifying office location...');
+      
+      try {
+        const isInRadius = await this.locationFetcher.isLocationInRadius();
+        console.log('[CheckIn] Office radius check result:', isInRadius);
+        
+        if (!isInRadius) {
+          Alert.alert(
+            'Location Mismatch',
+            'You must be within office premises to check in'
+          );
+          this.setState({ isLoading: false }); // Make sure to reset loading state
+          return;
+        }
+      } catch (error) {
+        console.error('[CheckIn] Office validation failed:', error);
+        Alert.alert(
+          'Validation Error',
+          'Could not verify office location'
+        );
+        this.setState({ isLoading: false }); // Reset loading state on error
+        return;
+      }
+    }
 
-      Alert.alert("Error", "Enter reason or location");
-      return;
-    }
-    const isHaveLocation = this.getLocationAddressForPlace()
-    if (isHaveLocation === '') {
-      Alert.alert("Error", "Location couldn't able to fetch location");
-      return
-    }
-    this.setState({ isLoading: false })
-    this.setState({ isVerifyFace: true }, () => {
-      // this.animate();
+    // 3. All validations passed - proceed with face verification
+    console.log('[CheckIn] All validations passed, starting face verification');
+    this.setState({ 
+      isVerifyFace: true,
+      isLoading: false 
+    }, () => {
       this.showTimerWhenFaceDetected();
     });
 
-  };
+  } catch (error) {
+    console.error('[CheckIn] Verification failed:', error);
+    this.setState({ isLoading: false }); // Reset loading state on error
+    Alert.alert(
+      'Check-in Error',
+      'Failed to start check-in process'
+    );
+  }
+};
+
+
+
   takePicture = async function () {
     if (this.camera) {
       let base64 = "";
@@ -2855,24 +3028,43 @@ export default class CheckInScreen extends React.Component {
       </View>
     )
   }
-  onChoosePlaceOffice = async (value) => {
-    console.log("inside place office");
-    const { organisationDetails } = this.state;
-    let isAllowed = organisationDetails.entityLocationRadius.is_allowed;
-    let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
-    if (isAllowed && checkIsInRadius) {
-      this.isAllowtocheckin = true;
 
-    } else {
-      this.isAllowtocheckin = value === true ? false : true;
-    }
+
+  onChoosePlaceOffice = async (value) => {
+  console.log("Starting office location validation...");
+  
+  try {
+    const isInRadius = await this.locationFetcher.isLocationInRadius();
+    console.log('Office radius validation result:', isInRadius);
+    
+    this.isAllowtocheckin = isInRadius;
     this.setState({
-      isOffice: true,
+      isOffice: isInRadius, // Only set to true if in radius
       isWorkFromHome: false,
       isManual: false,
       isPlace: false,
     });
-  };
+
+    if (!isInRadius) {
+      Alert.alert(
+        'Location Mismatch',
+        'You are not within the office premises'
+      );
+    }
+  } catch (error) {
+    console.error('Office location validation failed:', error);
+    this.isAllowtocheckin = false;
+    this.setState({
+      isOffice: false,
+      isWorkFromHome: false,
+      isManual: false,
+      isPlace: false,
+    });
+  }
+};
+
+
+
   onChoosePlaceWrkFrmHome = (value) => {
     this.isAllowtocheckin = true;
     this.setState({
@@ -3025,36 +3217,49 @@ export default class CheckInScreen extends React.Component {
     longitudeDelta: LONGITUDE_DELTA,
   });
 
-  getLoctionObj = async (locationObj) => {
-    let locationName = this.currentLocationObj;
 
-    if (this.state.isLocationFetcherRequired) {
+getLoctionObj = async (locationObj) => {
+  let locationName = this.currentLocationObj;
 
-      if (this.currentLocationObj.formatted_address == "") {
-
+  if (this.state.isLocationFetcherRequired) {
+    try {
+      if (this.currentLocationObj.formatted_address === "" || Platform.OS === 'ios') {
         locationName = await this.geoCoder.getPlaceFromCordinate(
           locationObj.latitude,
           locationObj.longitude
         );
-
       }
+      
       this.currentLocationObj = locationName;
-      console.log('locationName--->', locationName);
       const newCordObj = {
         longitude: locationObj.longitude,
         latitude: locationObj.latitude,
       };
       this.cordinateObj = newCordObj;
+      
       if (!this.state.isManual) {
         this.setState({
-          locationName: this.currentLocationObj.formatted_address,
+          locationName: this.currentLocationObj.formatted_address || 'Current Location',
           isInitialLoad: false,
           isLoading: false,
         });
       }
-      this.setState({ isInitialLoad: false, isLoading: false });
+    } catch (error) {
+      console.error('Error getting location:', error);
+      if (Platform.OS === 'ios') {
+        this.setState({
+          locationName: 'Current Location',
+          isInitialLoad: false,
+          isLoading: false,
+        });
+      }
     }
-  };
+  }
+};
+
+
+
+
   isInRadius = (isInRadius) => { };
   renderTeamsView() {
     const { getAllTeamData, teamMultipleSelect } = this.state;
@@ -3242,7 +3447,7 @@ export default class CheckInScreen extends React.Component {
             isInRadiusOrNot={(isInRadius) => this.isInRadius(isInRadius)}
             isInitialLoad={this.state.isInitialLoad}
           />
-          <Loader loading={isLoading} />
+          {/* <Loader loading={isLoading} /> */}
           <LinearGradient
             start={{ x: 0.5, y: 1.0 }}
             end={{ x: 0.0, y: 0.25 }}
@@ -3273,7 +3478,7 @@ export default class CheckInScreen extends React.Component {
             end={{ x: 0.0, y: 0.25 }}
             colors={this.getNavigationColor()}
           >
-            <MaterialTabs
+            {/* <MaterialTabs
   items={["Job", "Case", "Place"]}
   selectedIndex={this.state.selectedTab}
   onChange={(e) => this.setSelectedTab(e)}
@@ -3281,210 +3486,212 @@ export default class CheckInScreen extends React.Component {
   textStyle={{ fontSize: 21, fontWeight: "700" }}
   barColor="transparent"
   indicatorColor="black"
-  activeTextColor="#71797E	"         // Selected tab = white
+  activeTextColor="#71797E"         // Selected tab = white
   inactiveTextColor="black"       // Unselected tabs = black
-/>
+/> */}
           </LinearGradient>
-          <ScrollView
-            contentContainerStyle={{ paddingBottom: 60 }}
-            ref={(ref) => {
-              this.scrollView = ref;
-            }}
-            onContentSizeChange={() =>
-              this.scrollView.scrollToEnd({ animated: true })
-            }
-            style={{ marginBottom: 20 }}
-          >
-            {this.getCurrentPage()}
-            {this.renderTeamsView()}
-          </ScrollView>
+          <FlatList
+  // —–– The list that used to be in renderTeamsView()
+  data={this.state.teams}                  // 👈 whatever your list data is
+  renderItem={this.renderTeamItem}
+  keyExtractor={(item) => item.id.toString()}
+  // ––– put the old static content in the header/footer
+  ListHeaderComponent={() => this.getCurrentPage()} 
+  // optional footer, if renderTeamsView() also returns static parts
+  // ListFooterComponent={() => <View><Text>footer</Text></View>}
+  contentContainerStyle={{ paddingBottom: 60 }}
+  ref={(ref) => { this.flatList = ref; }}
+  onContentSizeChange={() => {
+    this.flatList?.scrollToEnd({ animated: true });
+  }}
+/>
           <View style={{ flexDirection: "row", marginHorizontal: 24 }}>
-            {findProjectDetails === null && selectedTab == 0 ? (
-              <View
-                style={{
-                  flex: 1,
-                  marginBottom: 30,
-                  justifyContent: "center",
-                  alignSelf: "center",
-                }}
-              >
-                <LinearGradient
-                  start={{ x: 0.5, y: 1.0 }}
-                  end={{ x: 0.0, y: 0.25 }}
-                  colors={["#fe717f", "#fa8576", "#f6976e"]}
-                  style={[styles.startButton, { opacity: 0.5 }]}
-                >
-                  <Text style={styles.startText}>Start</Text>
-                </LinearGradient>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  marginBottom: 30,
-                  justifyContent: "center",
-                  alignSelf: "center",
-                }}
-                onPress={() => this.flushtimer()}
-              >
-                <LinearGradient
-                  start={{ x: 0.5, y: 1.0 }}
-                  end={{ x: 0.0, y: 0.25 }}
-                  colors={["#fe717f", "#fa8576", "#f6976e"]}
-                  style={styles.startButton}
-                >
-                  <Text style={styles.startText}>Start</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
-            <View style={{ flex: 1, marginLeft: 24 }}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => this.onGoBackToPrevious()}
-              >
-                <Text style={styles.startText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
+  {findProjectDetails === null && selectedTab == 0 ? (
+    <View
+      style={{
+        flex: 1,
+        marginBottom: 30,
+        justifyContent: "center",
+        alignSelf: "center",
+      }}
+    >
+      <LinearGradient
+        start={{ x: 0.5, y: 1.0 }}
+        end={{ x: 0.0, y: 0.25 }}
+        colors={["#fe717f", "#fa8576", "#f6976e"]}
+        style={[styles.startButton, { opacity: 0.5 }]}
+      >
+        <Text style={styles.startText}>Start</Text>
+      </LinearGradient>
+    </View>
+  ) : (
+    <TouchableOpacity
+      style={{
+        flex: 1,
+        marginBottom: 30,
+        justifyContent: "center",
+        alignSelf: "center",
+      }}
+      onPress={async () => {
+        // Add location validation before proceeding
+        if (this.state.isOffice) {
+          try {
+            const isInRadius = await this.locationFetcher.isLocationInRadius();
+            if (!isInRadius) {
+              Alert.alert(
+                'Location Error',
+                'You must be at the office location to check in'
+              );
+              return;
+            }
+          } catch (error) {
+            console.error('Location validation failed:', error);
+            Alert.alert(
+              'Error',
+              'Could not verify your location'
+            );
+            return;
+          }
+        }
+        this.flushtimer();
+      }}
+    >
+      <LinearGradient
+        start={{ x: 0.5, y: 1.0 }}
+        end={{ x: 0.0, y: 0.25 }}
+        colors={["#fe717f", "#fa8576", "#f6976e"]}
+        style={styles.startButton}
+      >
+        <Text style={styles.startText}>Start</Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  )}
+  
+  <View style={{ flex: 1, marginLeft: 24 }}>
+    <TouchableOpacity
+      style={styles.cancelButton}
+      onPress={() => this.onGoBackToPrevious()}
+    >
+      <Text style={styles.startText}>Cancel</Text>
+    </TouchableOpacity>
+  </View>
 
-
-            {
-              faceReportPopup === true ?
-                (
-                  <View
+  {faceReportPopup === true && (
+    <View style={{
+      alignItems: "center",
+      flexDirection: "column",
+    }}>
+      <View style={{
+        margin: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+        shadowColor: "#000",
+        width: "100%",
+        height: "100%",
+      }}>
+        <View style={{
+          margin: 40,
+          backgroundColor: "white",
+          borderRadius: 20,
+          shadowColor: "#000",
+        }}>
+          <View style={{
+            borderRadius: 20,
+            flexDirection: "column",
+          }}>
+            <View style={{
+              width: 100,
+              height: 100,
+              backgroundColor: "white",
+              justifyContent: "center",
+              alignItems: "center",
+              shadowColor: "#000000",
+              shadowOffset: {
+                width: 0,
+                height: 4,
+              },
+              shadowRadius: 5,
+              shadowOpacity: 1.0,
+              borderColor: color.darkGrey,
+              borderWidth: 1,
+              top: -50,
+              zIndex: 5,
+              borderRadius: 50,
+              elevation: 5,
+            }}>
+              <View style={{
+                flexDirection: "row",
+                marginHorizontal: 30,
+                justifyContent: "space-between",
+                marginBottom: 30,
+              }}>
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    marginRight: 10,
+                    justifyContent: "center",
+                    alignSelf: "center",
+                    borderRadius: 20,
+                    borderWidth: 1,
+                    borderColor: color.pinkBorder,
+                    height: 40,
+                  }}
+                  onPress={() => this.setState({ faceReportPopup: false })}
+                >
+                  <Text style={{
+                    textAlign: "center",
+                    fontSize: 17,
+                    fontWeight: "600",
+                    textTransform: "uppercase",
+                    color: color.pinkBorder,
+                    backgroundColor: "transparent",
+                  }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{
+                    marginLeft: 10,
+                    flex: 1,
+                    justifyContent: "center",
+                    alignSelf: "center",
+                  }}
+                  onPress={() => {
+                    this.setState({ faceReportPopup: false });
+                    this.modalReverifyAction();
+                  }}
+                >
+                  <LinearGradient
+                    start={{ x: 0.5, y: 1.0 }}
+                    end={{ x: 0.0, y: 0.25 }}
+                    colors={["#fe717f", "#fa8576", "#f6976e"]}
                     style={{
-                      alignItems: "center",
-                      flexDirection: "column",
+                      width: "100%",
+                      height: 40,
+                      borderRadius: 24,
+                      alignSelf: "center",
+                      justifyContent: "center",
                     }}
                   >
-                    <View
-                      style={{
-                        margin: 0,
-                        backgroundColor: "rgba(0,0,0,0.5)",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        shadowColor: "#000",
-                        width: "100%",
-                        height: "100%",
-                      }}
-                    >
-                      <View style={{
-                        margin: 40,
-                        backgroundColor: "white",
-                        borderRadius: 20,
-                        shadowColor: "#000",
-                      }}>
-                        <View style={{
-                          borderRadius: 20,
-                          flexDirection: "column",
-                        }}>
-                          <View styles={{
-                            width: 100,
-                            height: 100,
-                            backgroundColor: "white",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            shadowColor: "#000000",
-                            shadowOffset: {
-                              width: 0,
-                              height: 4,
-                            },
-                            shadowRadius: 5,
-                            shadowOpacity: 1.0,
-                            borderColor: color.darkGrey,
-                            borderWidth: 1,
-                            top: -50,
-                            zIndex: 5,
-                            borderRadius: 50,
-                            elevation: 5,
-                          }}
-                          >
-                            <View
-                              style={{
-                                flexDirection: "row",
-                                marginHorizontal: 30,
-                                justifyContent: "space-between",
-                                marginBottom: 30,
-                              }}
-                            >
-                              <TouchableOpacity
-                                style={{
-                                  flex: 1,
-                                  marginRight: 10,
-                                  justifyContent: "center",
-                                  alignSelf: "center",
-                                  borderRadius: 20,
-                                  borderWidth: 1,
-                                  borderColor: color.pinkBorder,
-                                  height: 40,
-                                }}
-                                onPress={() => modalCloseAction()}
-                              >
-                                <Text style={{
-                                  textAlign: "center",
-                                  fontSize: 17,
-                                  fontWeight: "600",
-                                  textTransform: "uppercase",
-                                  color: color.pinkBorder,
-                                  backgroundColor: "transparent",
-                                }}>Cancel</Text>
-                                {/* </LinearGradient> */}
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                style={{
-                                  marginLeft: 10,
-                                  flex: 1,
-                                  justifyContent: "center",
-                                  alignSelf: "center",
-                                }}
-                                onPress={() => modalReverifyAction()}
-                              >
-                                <LinearGradient
-                                  start={{ x: 0.5, y: 1.0 }}
-                                  end={{ x: 0.0, y: 0.25 }}
-                                  colors={["#fe717f", "#fa8576", "#f6976e"]}
-                                  style={{
-                                    width: "100%",
-                                    height: 40,
-                                    borderRadius: 24,
-                                    alignSelf: "center",
-                                    justifyContent: "center",
-                                  }}
-                                >
-                                  <Text style={{
-                                    textAlign: "center",
-                                    fontSize: 17,
-                                    fontWeight: "600",
-                                    textTransform: "uppercase",
-                                    color: color.white,
-                                    backgroundColor: "transparent",
-                                  }}>Reverify</Text>
-                                </LinearGradient>
-                              </TouchableOpacity>
-                            </View>
-
-
-                          </View>
-
-                        </View>
-
-
-
-                      </View>
-                    </View>
-
-                  </View>
-
-
-
-
-                ) : null
-
-
-
-            }
-
-
+                    <Text style={{
+                      textAlign: "center",
+                      fontSize: 17,
+                      fontWeight: "600",
+                      textTransform: "uppercase",
+                      color: color.white,
+                      backgroundColor: "transparent",
+                    }}>Reverify</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
+        </View>
+      </View>
+    </View>
+  )}
+</View>
+
+          
           <CustomPopUpModal
             modalVisible={this.state.showAlertIdNoFace}
             modalCloseAction={this.modalCloseAction}
