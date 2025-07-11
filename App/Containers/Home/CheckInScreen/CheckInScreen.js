@@ -55,6 +55,10 @@ import { getUUID } from "../../../helper";
 import {check, request, PERMISSIONS, RESULTS} from 'react-native-permissions';
 
 
+//new imports
+
+
+
 const windowWidth = Dimensions.get("window").width;
 const windowHeight = Dimensions.get("window").height;
 const LATITUDE_DELTA = 0.009;
@@ -71,16 +75,11 @@ var faceimage;
 export default class CheckInScreen extends React.Component {
   constructor(props) {
     super(props);
-
-     const initialLocation = props.route.params?.locationDetails || {
+       const initialLocation = props.route.params?.locationDetails || {
     formatted_address: '',
     latitude: 0,
     longitude: 0
   };
-
-    
-
-
     this.state = {
       progress: 0,
       timer_error: true,
@@ -195,8 +194,7 @@ export default class CheckInScreen extends React.Component {
       (this.ModalOpen = false);
     this.isAllowtocheckin = false;
   }
-
-  // Modify componentDidMount to properly handle iOS permissions
+// Modify componentDidMount to properly handle iOS permissions
 async componentDidMount() {
   try {
     counter_face_data = 0;
@@ -323,8 +321,7 @@ async componentDidMount() {
     
     console.log('[Init] Starting error timer...');
     this.errortimer();
-
-    // 4. Set up navigation listener
+// 4. Set up navigation listener
     this._unsubscribe = this.props.navigation.addListener("blur", () => {
       console.log('[Cleanup] Removing location listeners...');
       if (this.locationFetcher) {
@@ -385,7 +382,7 @@ hasValidLocation = () => {
   /**
    * Get employee details
    */
-getEmployeeDetails = async () => {
+  getEmployeeDetails = async () => {
   try {
     const employeeDetails = await getData(LocalDBItems.employeeDetails);
     if (!employeeDetails) {
@@ -702,8 +699,8 @@ getEmployeeDetails = async () => {
    * Verify face and show timer
    * @returns
    */
-verifyFaceRekcongition = async () => {
-  console.log('[CheckIn] Starting verification process...');
+  verifyFaceRekcongition = async () => {
+console.log('[CheckIn] Starting verification process...');
   
   try {
     // 1. Validate we have proper location data
@@ -761,9 +758,6 @@ verifyFaceRekcongition = async () => {
     );
   }
 };
-
-
-
   takePicture = async function () {
     if (this.camera) {
       let base64 = "";
@@ -3027,10 +3021,7 @@ verifyFaceRekcongition = async () => {
         </View>
       </View>
     )
-  }
-
-
-  onChoosePlaceOffice = async (value) => {
+  } onChoosePlaceOffice = async (value) => {
   console.log("Starting office location validation...");
   
   try {
@@ -3062,9 +3053,6 @@ verifyFaceRekcongition = async () => {
     });
   }
 };
-
-
-
   onChoosePlaceWrkFrmHome = (value) => {
     this.isAllowtocheckin = true;
     this.setState({
@@ -3217,26 +3205,24 @@ verifyFaceRekcongition = async () => {
     longitudeDelta: LONGITUDE_DELTA,
   });
 
+  getLoctionObj = async (locationObj) => {
+    let locationName = this.currentLocationObj;
 
-getLoctionObj = async (locationObj) => {
-  let locationName = this.currentLocationObj;
-
-  if (this.state.isLocationFetcherRequired) {
-    try {
+    if (this.state.isLocationFetcherRequired) {
+  try {
       if (this.currentLocationObj.formatted_address === "" || Platform.OS === 'ios') {
         locationName = await this.geoCoder.getPlaceFromCordinate(
           locationObj.latitude,
           locationObj.longitude
         );
       }
-      
       this.currentLocationObj = locationName;
+      console.log('locationName--->', locationName);
       const newCordObj = {
         longitude: locationObj.longitude,
         latitude: locationObj.latitude,
       };
       this.cordinateObj = newCordObj;
-      
       if (!this.state.isManual) {
         this.setState({
           locationName: this.currentLocationObj.formatted_address || 'Current Location',
@@ -3244,7 +3230,7 @@ getLoctionObj = async (locationObj) => {
           isLoading: false,
         });
       }
-    } catch (error) {
+ } catch (error) {
       console.error('Error getting location:', error);
       if (Platform.OS === 'ios') {
         this.setState({
@@ -3256,10 +3242,6 @@ getLoctionObj = async (locationObj) => {
     }
   }
 };
-
-
-
-
   isInRadius = (isInRadius) => { };
   renderTeamsView() {
     const { getAllTeamData, teamMultipleSelect } = this.state;
@@ -3447,7 +3429,7 @@ getLoctionObj = async (locationObj) => {
             isInRadiusOrNot={(isInRadius) => this.isInRadius(isInRadius)}
             isInitialLoad={this.state.isInitialLoad}
           />
-          {/* <Loader loading={isLoading} /> */}
+          
           <LinearGradient
             start={{ x: 0.5, y: 1.0 }}
             end={{ x: 0.0, y: 0.25 }}
@@ -3478,220 +3460,208 @@ getLoctionObj = async (locationObj) => {
             end={{ x: 0.0, y: 0.25 }}
             colors={this.getNavigationColor()}
           >
-            {/* <MaterialTabs
-  items={["Job", "Case", "Place"]}
-  selectedIndex={this.state.selectedTab}
-  onChange={(e) => this.setSelectedTab(e)}
-  uppercase={false}
-  textStyle={{ fontSize: 21, fontWeight: "700" }}
-  barColor="transparent"
-  indicatorColor="black"
-  activeTextColor="#71797E"         // Selected tab = white
-  inactiveTextColor="black"       // Unselected tabs = black
-/> */}
+          
           </LinearGradient>
-          <FlatList
-  // —–– The list that used to be in renderTeamsView()
-  data={this.state.teams}                  // 👈 whatever your list data is
-  renderItem={this.renderTeamItem}
-  keyExtractor={(item) => item.id.toString()}
-  // ––– put the old static content in the header/footer
-  ListHeaderComponent={() => this.getCurrentPage()} 
-  // optional footer, if renderTeamsView() also returns static parts
-  // ListFooterComponent={() => <View><Text>footer</Text></View>}
-  contentContainerStyle={{ paddingBottom: 60 }}
-  ref={(ref) => { this.flatList = ref; }}
-  onContentSizeChange={() => {
-    this.flatList?.scrollToEnd({ animated: true });
-  }}
-/>
-          <View style={{ flexDirection: "row", marginHorizontal: 24 }}>
-  {findProjectDetails === null && selectedTab == 0 ? (
-    <View
-      style={{
-        flex: 1,
-        marginBottom: 30,
-        justifyContent: "center",
-        alignSelf: "center",
-      }}
-    >
-      <LinearGradient
-        start={{ x: 0.5, y: 1.0 }}
-        end={{ x: 0.0, y: 0.25 }}
-        colors={["#fe717f", "#fa8576", "#f6976e"]}
-        style={[styles.startButton, { opacity: 0.5 }]}
-      >
-        <Text style={styles.startText}>Start</Text>
-      </LinearGradient>
-    </View>
-  ) : (
-    <TouchableOpacity
-      style={{
-        flex: 1,
-        marginBottom: 30,
-        justifyContent: "center",
-        alignSelf: "center",
-      }}
-      onPress={async () => {
-        // Add location validation before proceeding
-        if (this.state.isOffice) {
-          try {
-            const isInRadius = await this.locationFetcher.isLocationInRadius();
-            if (!isInRadius) {
-              Alert.alert(
-                'Location Error',
-                'You must be at the office location to check in'
-              );
-              return;
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: 60 }}
+            ref={(ref) => {
+              this.scrollView = ref;
+            }}
+            onContentSizeChange={() =>
+              this.scrollView.scrollToEnd({ animated: true })
             }
-          } catch (error) {
-            console.error('Location validation failed:', error);
-            Alert.alert(
-              'Error',
-              'Could not verify your location'
-            );
-            return;
-          }
-        }
-        this.flushtimer();
-      }}
-    >
-      <LinearGradient
-        start={{ x: 0.5, y: 1.0 }}
-        end={{ x: 0.0, y: 0.25 }}
-        colors={["#fe717f", "#fa8576", "#f6976e"]}
-        style={styles.startButton}
-      >
-        <Text style={styles.startText}>Start</Text>
-      </LinearGradient>
-    </TouchableOpacity>
-  )}
-  
-  <View style={{ flex: 1, marginLeft: 24 }}>
-    <TouchableOpacity
-      style={styles.cancelButton}
-      onPress={() => this.onGoBackToPrevious()}
-    >
-      <Text style={styles.startText}>Cancel</Text>
-    </TouchableOpacity>
-  </View>
+            style={{ marginBottom: 20 }}
+          >
+            {this.getCurrentPage()}
+            {this.renderTeamsView()}
+          </ScrollView>
+          <View style={{ flexDirection: "row", marginHorizontal: 24 }}>
+            {findProjectDetails === null && selectedTab == 0 ? (
+              <View
+                style={{
+                  flex: 1,
+                  marginBottom: 30,
+                  justifyContent: "center",
+                  alignSelf: "center",
+                }}
+              >
+                <LinearGradient
+                  start={{ x: 0.5, y: 1.0 }}
+                  end={{ x: 0.0, y: 0.25 }}
+                  colors={["#fe717f", "#fa8576", "#f6976e"]}
+                  style={[styles.startButton, { opacity: 0.5 }]}
+                >
+                  <Text style={styles.startText}>Start</Text>
+                </LinearGradient>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  marginBottom: 30,
+                  justifyContent: "center",
+                  alignSelf: "center",
+                }}
+                onPress={() => this.flushtimer()}
+              >
+                <LinearGradient
+                  start={{ x: 0.5, y: 1.0 }}
+                  end={{ x: 0.0, y: 0.25 }}
+                  colors={["#fe717f", "#fa8576", "#f6976e"]}
+                  style={styles.startButton}
+                >
+                  <Text style={styles.startText}>Start</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+            <View style={{ flex: 1, marginLeft: 24 }}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => this.onGoBackToPrevious()}
+              >
+                <Text style={styles.startText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
 
-  {faceReportPopup === true && (
-    <View style={{
-      alignItems: "center",
-      flexDirection: "column",
-    }}>
-      <View style={{
-        margin: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        justifyContent: "center",
-        alignItems: "center",
-        shadowColor: "#000",
-        width: "100%",
-        height: "100%",
-      }}>
-        <View style={{
-          margin: 40,
-          backgroundColor: "white",
-          borderRadius: 20,
-          shadowColor: "#000",
-        }}>
-          <View style={{
-            borderRadius: 20,
-            flexDirection: "column",
-          }}>
-            <View style={{
-              width: 100,
-              height: 100,
-              backgroundColor: "white",
-              justifyContent: "center",
-              alignItems: "center",
-              shadowColor: "#000000",
-              shadowOffset: {
-                width: 0,
-                height: 4,
-              },
-              shadowRadius: 5,
-              shadowOpacity: 1.0,
-              borderColor: color.darkGrey,
-              borderWidth: 1,
-              top: -50,
-              zIndex: 5,
-              borderRadius: 50,
-              elevation: 5,
-            }}>
-              <View style={{
-                flexDirection: "row",
-                marginHorizontal: 30,
-                justifyContent: "space-between",
-                marginBottom: 30,
-              }}>
-                <TouchableOpacity
-                  style={{
-                    flex: 1,
-                    marginRight: 10,
-                    justifyContent: "center",
-                    alignSelf: "center",
-                    borderRadius: 20,
-                    borderWidth: 1,
-                    borderColor: color.pinkBorder,
-                    height: 40,
-                  }}
-                  onPress={() => this.setState({ faceReportPopup: false })}
-                >
-                  <Text style={{
-                    textAlign: "center",
-                    fontSize: 17,
-                    fontWeight: "600",
-                    textTransform: "uppercase",
-                    color: color.pinkBorder,
-                    backgroundColor: "transparent",
-                  }}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={{
-                    marginLeft: 10,
-                    flex: 1,
-                    justifyContent: "center",
-                    alignSelf: "center",
-                  }}
-                  onPress={() => {
-                    this.setState({ faceReportPopup: false });
-                    this.modalReverifyAction();
-                  }}
-                >
-                  <LinearGradient
-                    start={{ x: 0.5, y: 1.0 }}
-                    end={{ x: 0.0, y: 0.25 }}
-                    colors={["#fe717f", "#fa8576", "#f6976e"]}
+
+            {
+              faceReportPopup === true ?
+                (
+                  <View
                     style={{
-                      width: "100%",
-                      height: 40,
-                      borderRadius: 24,
-                      alignSelf: "center",
-                      justifyContent: "center",
+                      alignItems: "center",
+                      flexDirection: "column",
                     }}
                   >
-                    <Text style={{
-                      textAlign: "center",
-                      fontSize: 17,
-                      fontWeight: "600",
-                      textTransform: "uppercase",
-                      color: color.white,
-                      backgroundColor: "transparent",
-                    }}>Reverify</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </View>
-    </View>
-  )}
-</View>
+                    <View
+                      style={{
+                        margin: 0,
+                        backgroundColor: "rgba(0,0,0,0.5)",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        shadowColor: "#000",
+                        width: "100%",
+                        height: "100%",
+                      }}
+                    >
+                      <View style={{
+                        margin: 40,
+                        backgroundColor: "white",
+                        borderRadius: 20,
+                        shadowColor: "#000",
+                      }}>
+                        <View style={{
+                          borderRadius: 20,
+                          flexDirection: "column",
+                        }}>
+                          <View styles={{
+                            width: 100,
+                            height: 100,
+                            backgroundColor: "white",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            shadowColor: "#000000",
+                            shadowOffset: {
+                              width: 0,
+                              height: 4,
+                            },
+                            shadowRadius: 5,
+                            shadowOpacity: 1.0,
+                            borderColor: color.darkGrey,
+                            borderWidth: 1,
+                            top: -50,
+                            zIndex: 5,
+                            borderRadius: 50,
+                            elevation: 5,
+                          }}
+                          >
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                marginHorizontal: 30,
+                                justifyContent: "space-between",
+                                marginBottom: 30,
+                              }}
+                            >
+                              <TouchableOpacity
+                                style={{
+                                  flex: 1,
+                                  marginRight: 10,
+                                  justifyContent: "center",
+                                  alignSelf: "center",
+                                  borderRadius: 20,
+                                  borderWidth: 1,
+                                  borderColor: color.pinkBorder,
+                                  height: 40,
+                                }}
+                                onPress={() => modalCloseAction()}
+                              >
+                                <Text style={{
+                                  textAlign: "center",
+                                  fontSize: 17,
+                                  fontWeight: "600",
+                                  textTransform: "uppercase",
+                                  color: color.pinkBorder,
+                                  backgroundColor: "transparent",
+                                }}>Cancel</Text>
+                                {/* </LinearGradient> */}
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={{
+                                  marginLeft: 10,
+                                  flex: 1,
+                                  justifyContent: "center",
+                                  alignSelf: "center",
+                                }}
+                                onPress={() => modalReverifyAction()}
+                              >
+                                <LinearGradient
+                                  start={{ x: 0.5, y: 1.0 }}
+                                  end={{ x: 0.0, y: 0.25 }}
+                                  colors={["#fe717f", "#fa8576", "#f6976e"]}
+                                  style={{
+                                    width: "100%",
+                                    height: 40,
+                                    borderRadius: 24,
+                                    alignSelf: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Text style={{
+                                    textAlign: "center",
+                                    fontSize: 17,
+                                    fontWeight: "600",
+                                    textTransform: "uppercase",
+                                    color: color.white,
+                                    backgroundColor: "transparent",
+                                  }}>Reverify</Text>
+                                </LinearGradient>
+                              </TouchableOpacity>
+                            </View>
 
-          
+
+                          </View>
+
+                        </View>
+
+
+
+                      </View>
+                    </View>
+
+                  </View>
+
+
+
+
+                ) : null
+
+
+
+            }
+
+
+          </View>
           <CustomPopUpModal
             modalVisible={this.state.showAlertIdNoFace}
             modalCloseAction={this.modalCloseAction}
