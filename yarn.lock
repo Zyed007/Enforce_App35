@@ -8362,6 +8362,23 @@ react-native-vector-icons@^10.2.0:
     prop-types "^15.7.2"
     yargs "^16.1.1"
 
+react-native-vision-camera-face-detector@^1.8.6:
+  version "1.8.6"
+  resolved "https://registry.npmjs.org/react-native-vision-camera-face-detector/-/react-native-vision-camera-face-detector-1.8.6.tgz"
+  integrity sha512-2BV8wQI+EYCRY6rsPaWypUDcw/aslEQqr595kanjQUgniEpjdZ2JN2yrN1uLmXW84kHa9+cINMgXkQasCX4i7w==
+
+react-native-vision-camera@^4.7.0:
+  version "4.7.0"
+  resolved "https://registry.npmjs.org/react-native-vision-camera/-/react-native-vision-camera-4.7.0.tgz"
+  integrity sha512-aiwmBIhpiQA7fuhqRiBFAgISBI+qAyoZeZakjz/PDwUEuwGKmjYrC2LMOcFAkqSKvDA4vsoOXGxpnk77NoCZBA==
+
+react-native-worklets-core@^1.6.0:
+  version "1.6.0"
+  resolved "https://registry.npmjs.org/react-native-worklets-core/-/react-native-worklets-core-1.6.0.tgz"
+  integrity sha512-IRu8UUROsRklFdeqmZdWxeCq+EYYSCV8zj4S9mdPwm1K72OehptoYbZCU3+2NjINF4I8Q+Z+z5TwaJQpKQBYmg==
+  dependencies:
+    string-hash-64 "^1.0.3"
+
 react-native@0.79.2:
   version "0.79.2"
   resolved "https://registry.npmjs.org/react-native/-/react-native-0.79.2.tgz"
@@ -9022,6 +9039,11 @@ string_decoder@^1.1.1:
   integrity sha512-hkRX8U1WjJFd8LsDJ2yQ/wWWxaopEsABU1XfkM8A+j0+85JAGppt16cr1Whg6KIbb4okU6Mql6BOj+uup/wKeA==
   dependencies:
     safe-buffer "~5.2.0"
+
+string-hash-64@^1.0.3:
+  version "1.0.3"
+  resolved "https://registry.npmjs.org/string-hash-64/-/string-hash-64-1.0.3.tgz"
+  integrity sha512-D5OKWKvDhyVWWn2x5Y9b+37NUllks34q1dCDhk/vYcso9fmhs+Tl3KR/gE4v5UNj2UA35cnX4KdVVGkG1deKqw==
 
 string-length@^4.0.1:
   version "4.0.2"

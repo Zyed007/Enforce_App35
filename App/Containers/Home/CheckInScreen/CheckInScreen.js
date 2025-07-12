@@ -9,6 +9,9 @@ import {
   Dimensions,
   Image,
   Alert,
+
+  SafeAreaView,
+  Button
 } from "react-native";
 import styles from "./style";
 import color from "../../../Theme/Colors"
@@ -37,8 +40,8 @@ import GeoCoder from "../../../Components/GeoCoder";
 import LocationFetcher from "../../LocationModule/index";
 import UtilityHelper from "../../../Components/UtilityHelper";
 import moment from "moment";
-import { RNCamera } from "react-native-camera";
-import { useCamera } from "react-native-camera-hooks"
+//import { RNCamera } from "react-native-camera";
+//import { useCamera } from "react-native-camera-hooks"
 import { searchFaceImages } from "../../../Services/AWSService";
 import CustomPopUpModal from "../../../Components/CustomPopup";
 
@@ -56,6 +59,16 @@ import {check, request, PERMISSIONS, RESULTS} from 'react-native-permissions';
 
 
 //new imports
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+  PhotoFile,
+  useFrameProcessor,
+} from 'react-native-vision-camera';
+import { Face, useFaceDetector, FaceDetectionOptions } from 'react-native-vision-camera-face-detector';
+import { Worklets } from 'react-native-worklets-core';
+//import LocationFetcher from './src/components/LocationFetcher';
 
 
 
@@ -489,7 +502,7 @@ hasValidLocation = () => {
       params: params,
     }
     const apiResponseData = await apiService(requestObj);
-    console.log(apiResponseData);
+    console.log("apiResponseData:",apiResponseData);
     const emp_role_id = employeDetails.role_id;
     const section_id_data = apiResponseData.filter(item => item.section_id === '8a55082f-5185-4d28-9098-4f268cb47d51' && item.role_id === emp_role_id);
     console.log("Section_data", section_id_data)
@@ -758,6 +771,9 @@ console.log('[CheckIn] Starting verification process...');
     );
   }
 };
+
+
+//takes picture function
   takePicture = async function () {
     if (this.camera) {
       let base64 = "";
@@ -842,7 +858,7 @@ console.log('[CheckIn] Starting verification process...');
                 this.setState({ showAlertIdNoFace: false, isVerifyFace: false });
                 // this.setState({ isVerifcationPopUp:true ,isReverification:true});
                 // console.log("Am done here", this.state.isReverification)
-                console.log("Sucess")
+                console.log("Success")
                 Alert.alert('Face Error Occured', 'We have failed to recoginize your face and click to submit the report ', [
                   {
                     text: 'Submit The report',
@@ -968,6 +984,9 @@ console.log('[CheckIn] Starting verification process...');
       }
     } catch (err) { }
   };
+
+
+
   /**
    * Add Time sheet API call after face is verified
    */
@@ -1121,6 +1140,8 @@ console.log('[CheckIn] Starting verification process...');
       }
       this.state.isOffice = false;
     }
+
+
     const params = {
       team_member_empid: teamMemberEmpId,
       teamid: teamId,
@@ -2670,6 +2691,8 @@ console.log('[CheckIn] Starting verification process...');
       <View style={{ marginTop: 20, flexDirection: "column" }}></View>
     </View>
   );
+
+  //render camera
   renderCamera() {
     const { canDetectFaces } = this.state;
     return (
@@ -2774,6 +2797,8 @@ console.log('[CheckIn] Starting verification process...');
       </RNCamera>
     );
   }
+
+
   // Face detection
   facesDetected = ({ faces }) => {
     if (faces.length > 0) {
@@ -2830,6 +2855,8 @@ console.log('[CheckIn] Starting verification process...');
       }
     }
   };
+
+
   renderFace = ({ bounds, faceID, rollAngle, yawAngle }) => (
     <View
       key={faceID}
@@ -2882,11 +2909,16 @@ console.log('[CheckIn] Starting verification process...');
       </View>
     );
   }
+
   renderLandmarks = () => (
     <View style={styles.facesContainer} pointerEvents="none">
       {this.state.faces.map(this.renderLandmarksOfFace)}
     </View>
   );
+
+
+
+
   onViewDescription = () => {
     this.setState({ isViewDecription: true });
   };
@@ -2928,6 +2960,8 @@ console.log('[CheckIn] Starting verification process...');
       </View>
     );
   }
+
+
   renderJobTabView() {
     const { getProjectList, findProjectDetails } = this.state;
     return (
@@ -3021,7 +3055,9 @@ console.log('[CheckIn] Starting verification process...');
         </View>
       </View>
     )
-  } onChoosePlaceOffice = async (value) => {
+  } 
+  
+  onChoosePlaceOffice = async (value) => {
   console.log("Starting office location validation...");
   
   try {
