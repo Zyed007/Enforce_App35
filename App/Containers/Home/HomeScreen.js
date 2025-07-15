@@ -160,6 +160,7 @@ export default class HomeScreen extends React.Component {
     this.getLocationTrackingNeeded()
     checkout_counter = 0;
   }
+  
   getLocationTrackingNeeded = async () => {
     let isLiveTracking = await getData(LocalDBItems.isLocationTrackingNeeded)
     if (isLiveTracking) {

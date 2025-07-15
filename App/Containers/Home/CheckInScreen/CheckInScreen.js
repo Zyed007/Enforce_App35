@@ -9,9 +9,6 @@ import {
   Dimensions,
   Image,
   Alert,
-
-  SafeAreaView,
-  Button
 } from "react-native";
 import styles from "./style";
 import color from "../../../Theme/Colors"
@@ -41,7 +38,7 @@ import LocationFetcher from "../../LocationModule/index";
 import UtilityHelper from "../../../Components/UtilityHelper";
 import moment from "moment";
 //import { RNCamera } from "react-native-camera";
-//import { useCamera } from "react-native-camera-hooks"
+import { useCamera } from "react-native-camera-hooks"
 import { searchFaceImages } from "../../../Services/AWSService";
 import CustomPopUpModal from "../../../Components/CustomPopup";
 
@@ -55,21 +52,16 @@ import * as Progress from 'react-native-progress';
 import LocationError from "../../../Components/LocationError"
 import ImagePicker from 'react-native-image-crop-picker'
 import { getUUID } from "../../../helper";
-import {check, request, PERMISSIONS, RESULTS} from 'react-native-permissions';
+import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import RNFS from 'react-native-fs';
+import FaceRecognitionCamera from './FaceRecognitionCamera';
 
 
 //new imports
-import {
-  Camera,
-  useCameraDevice,
-  useCameraPermission,
-  PhotoFile,
-  useFrameProcessor,
-} from 'react-native-vision-camera';
-import { Face, useFaceDetector, FaceDetectionOptions } from 'react-native-vision-camera-face-detector';
-import { Worklets } from 'react-native-worklets-core';
-//import LocationFetcher from './src/components/LocationFetcher';
-
+const addLog = (message) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${message}`);
+};
 
 
 const windowWidth = Dimensions.get("window").width;
@@ -88,12 +80,15 @@ var faceimage;
 export default class CheckInScreen extends React.Component {
   constructor(props) {
     super(props);
-       const initialLocation = props.route.params?.locationDetails || {
-    formatted_address: '',
-    latitude: 0,
-    longitude: 0
-  };
+    this.dismissAndGoBack = this.dismissAndGoBack.bind(this);
+    const initialLocation = props.route.params?.locationDetails || {
+      formatted_address: '',
+      latitude: 0,
+      longitude: 0
+    };
     this.state = {
+      showCameraLoader: false,  // Controls loader visibility
+      cameraReady: false,      // Tracks camera readiness
       progress: 0,
       timer_error: true,
       indeterminate: true,
@@ -103,7 +98,7 @@ export default class CheckInScreen extends React.Component {
       getProjectList: [],
       findProjectDetails: null,
       getAllTeamData: [],
-      UUID:"",
+      UUID: "",
       isTeamClicked: false,
       isForceCheckIn: false,
       isOffice: true,
@@ -171,8 +166,10 @@ export default class CheckInScreen extends React.Component {
       isLoading: true,
       faceReportPopup: false,
       locationName: initialLocation.formatted_address,
-
     };
+    this.dismissAndGoBack = this.dismissAndGoBack.bind(this);
+
+
     this.modalizeRef = React.createRef();
     (this.count = -1), (this.faceDetectedOrNot = false);
     this.timerCamera = 2;
@@ -207,168 +204,168 @@ export default class CheckInScreen extends React.Component {
       (this.ModalOpen = false);
     this.isAllowtocheckin = false;
   }
-// Modify componentDidMount to properly handle iOS permissions
-async componentDidMount() {
-  try {
-    counter_face_data = 0;
-    
-    // Initialize with default location values
-    this.currentLocationObj = {
-      formatted_address: 'Current Location',
-      latitude: 0,
-      longitude: 0,
-      street_number: '',
-      route: '',
-      locality: '',
-      administrative_area_level_2: '',
-      administrative_area_level_1: '',
-      postal_code: '',
-      country: ''
-    };
+  // Modify componentDidMount to properly handle iOS permissions
+  async componentDidMount() {
+    try {
+      counter_face_data = 0;
 
-    // 1. Initialize with passed location data if available
-    const { cordinateObj, locationDetails } = this.props.route.params || {};
-    if (cordinateObj && locationDetails) {
-      console.log('[Location] Initializing with passed location:', {
-        lat: cordinateObj.latitude,
-        lng: cordinateObj.longitude,
-        address: locationDetails.formatted_address
-      });
-
-      this.cordinateObj = {
-        latitude: cordinateObj.latitude,
-        longitude: cordinateObj.longitude
-      };
-
+      // Initialize with default location values
       this.currentLocationObj = {
-        ...this.currentLocationObj,
-        formatted_address: locationDetails.formatted_address || 'Current Location',
-        latitude: cordinateObj.latitude,
-        longitude: cordinateObj.longitude
+        formatted_address: 'Current Location',
+        latitude: 0,
+        longitude: 0,
+        street_number: '',
+        route: '',
+        locality: '',
+        administrative_area_level_2: '',
+        administrative_area_level_1: '',
+        postal_code: '',
+        country: ''
       };
 
-      this.setState({
-        locationName: locationDetails.formatted_address || 'Current Location',
-        isInitialLoad: false
-      });
-    }
+      // 1. Initialize with passed location data if available
+      const { cordinateObj, locationDetails } = this.props.route.params || {};
+      if (cordinateObj && locationDetails) {
+        console.log('[Location] Initializing with passed location:', {
+          lat: cordinateObj.latitude,
+          lng: cordinateObj.longitude,
+          address: locationDetails.formatted_address
+        });
 
-    // 2. iOS-specific location handling
-    if (Platform.OS === 'ios') {
-      try {
-        console.log('[iOS] Checking location permissions...');
-        const status = await check(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-        
-        if (status !== RESULTS.GRANTED) {
-          console.log('[iOS] Requesting location permissions...');
-          const newStatus = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-          
-          if (newStatus !== RESULTS.GRANTED) {
-            console.warn('[iOS] Location permission denied');
-            Alert.alert(
-              'Permission Required',
-              'Location access is needed for check-in functionality'
-            );
-            
-            // Even without permission, use passed location if available
-            if (cordinateObj) {
-              console.log('[iOS] Falling back to passed location due to permission denial');
-              this.currentLocationObj = {
-                ...this.currentLocationObj,
-                latitude: cordinateObj.latitude,
-                longitude: cordinateObj.longitude
-              };
-            }
-          }
-        }
+        this.cordinateObj = {
+          latitude: cordinateObj.latitude,
+          longitude: cordinateObj.longitude
+        };
 
-        // Set timeout for iOS location validation
-        this.locationTimeout = setTimeout(() => {
-          console.log('[iOS] Location validation timeout reached');
-          if (!this.hasValidLocation()) {
-            console.warn('[iOS] Location validation failed after timeout');
-            if (cordinateObj) {
-              console.log('[iOS] Using fallback location coordinates');
-              this.currentLocationObj = {
-                ...this.currentLocationObj,
-                latitude: cordinateObj.latitude,
-                longitude: cordinateObj.longitude
-              };
-            } else {
+        this.currentLocationObj = {
+          ...this.currentLocationObj,
+          formatted_address: locationDetails.formatted_address || 'Current Location',
+          latitude: cordinateObj.latitude,
+          longitude: cordinateObj.longitude
+        };
+
+        this.setState({
+          locationName: locationDetails.formatted_address || 'Current Location',
+          isInitialLoad: false
+        });
+      }
+
+      // 2. iOS-specific location handling
+      if (Platform.OS === 'ios') {
+        try {
+          console.log('[iOS] Checking location permissions...');
+          const status = await check(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
+
+          if (status !== RESULTS.GRANTED) {
+            console.log('[iOS] Requesting location permissions...');
+            const newStatus = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
+
+            if (newStatus !== RESULTS.GRANTED) {
+              console.warn('[iOS] Location permission denied');
               Alert.alert(
-                'Location Error', 
-                'Could not determine your current location'
+                'Permission Required',
+                'Location access is needed for check-in functionality'
               );
+
+              // Even without permission, use passed location if available
+              if (cordinateObj) {
+                console.log('[iOS] Falling back to passed location due to permission denial');
+                this.currentLocationObj = {
+                  ...this.currentLocationObj,
+                  latitude: cordinateObj.latitude,
+                  longitude: cordinateObj.longitude
+                };
+              }
             }
           }
-        }, 3000); // 3 second timeout
-      } catch (error) {
-        console.error('[iOS] Location permission error:', error);
-        // Fallback to passed location if available
-        if (cordinateObj) {
-          this.currentLocationObj = {
-            ...this.currentLocationObj,
-            latitude: cordinateObj.latitude,
-            longitude: cordinateObj.longitude
-          };
+
+          // Set timeout for iOS location validation
+          this.locationTimeout = setTimeout(() => {
+            console.log('[iOS] Location validation timeout reached');
+            if (!this.hasValidLocation()) {
+              console.warn('[iOS] Location validation failed after timeout');
+              if (cordinateObj) {
+                console.log('[iOS] Using fallback location coordinates');
+                this.currentLocationObj = {
+                  ...this.currentLocationObj,
+                  latitude: cordinateObj.latitude,
+                  longitude: cordinateObj.longitude
+                };
+              } else {
+                Alert.alert(
+                  'Location Error',
+                  'Could not determine your current location'
+                );
+              }
+            }
+          }, 3000); // 3 second timeout
+        } catch (error) {
+          console.error('[iOS] Location permission error:', error);
+          // Fallback to passed location if available
+          if (cordinateObj) {
+            this.currentLocationObj = {
+              ...this.currentLocationObj,
+              latitude: cordinateObj.latitude,
+              longitude: cordinateObj.longitude
+            };
+          }
         }
       }
-    }
 
-    // 3. Load essential data with validation
-    console.log('[Init] Loading employee details...');
-    const empDetails = await this.getEmployeeDetails();
-    if (!empDetails) {
-      throw new Error('Failed to load employee details');
-    }
-    console.log('[Init] Employee details loaded successfully');
-
-    console.log('[Init] Fetching project data...');
-    await this.fetchAllProjectByOrgID();
-    
-    console.log('[Init] Initializing geocoder...');
-    this.geoCoder.initiaLizeGeoCoder();
-    
-    console.log('[Init] Getting UUID...');
-    this.UUID = await getUUID();
-    
-    console.log('[Init] Starting error timer...');
-    this.errortimer();
-// 4. Set up navigation listener
-    this._unsubscribe = this.props.navigation.addListener("blur", () => {
-      console.log('[Cleanup] Removing location listeners...');
-      if (this.locationFetcher) {
-        this.locationFetcher.removeListners();
+      // 3. Load essential data with validation
+      console.log('[Init] Loading employee details...');
+      const empDetails = await this.getEmployeeDetails();
+      if (!empDetails) {
+        throw new Error('Failed to load employee details');
       }
-      if (this.locationTimeout) {
-        clearTimeout(this.locationTimeout);
-      }
-    });
+      console.log('[Init] Employee details loaded successfully');
 
-    console.log('[Init] CheckInScreen mounted successfully');
-    console.log('[Init] Current location state:', {
-      coords: this.cordinateObj,
-      address: this.currentLocationObj.formatted_address,
-      isInitialLoad: this.state.isInitialLoad
-    });
+      console.log('[Init] Fetching project data...');
+      await this.fetchAllProjectByOrgID();
 
-  } catch (error) {
-    console.error('[Init] Initialization failed:', error);
-    Alert.alert(
-      'Initialization Error',
-      'Failed to initialize check-in. Please try again.'
-    );
-    this.props.navigation.goBack();
+      console.log('[Init] Initializing geocoder...');
+      this.geoCoder.initiaLizeGeoCoder();
+
+      console.log('[Init] Getting UUID...');
+      this.UUID = await getUUID();
+
+      console.log('[Init] Starting error timer...');
+      this.errortimer();
+      // 4. Set up navigation listener
+      this._unsubscribe = this.props.navigation.addListener("blur", () => {
+        console.log('[Cleanup] Removing location listeners...');
+        if (this.locationFetcher) {
+          this.locationFetcher.removeListners();
+        }
+        if (this.locationTimeout) {
+          clearTimeout(this.locationTimeout);
+        }
+      });
+
+      console.log('[Init] CheckInScreen mounted successfully');
+      console.log('[Init] Current location state:', {
+        coords: this.cordinateObj,
+        address: this.currentLocationObj.formatted_address,
+        isInitialLoad: this.state.isInitialLoad
+      });
+
+    } catch (error) {
+      console.error('[Init] Initialization failed:', error);
+      Alert.alert(
+        'Initialization Error',
+        'Failed to initialize check-in. Please try again.'
+      );
+      this.props.navigation.goBack();
+    }
   }
-}
 
-// Helper method to validate location
-hasValidLocation = () => {
-  return this.currentLocationObj.latitude !== 0 && 
-         this.currentLocationObj.longitude !== 0 &&
-         this.currentLocationObj.latitude !== undefined &&
-         this.currentLocationObj.longitude !== undefined;
-};
+  // Helper method to validate location
+  hasValidLocation = () => {
+    return this.currentLocationObj.latitude !== 0 &&
+      this.currentLocationObj.longitude !== 0 &&
+      this.currentLocationObj.latitude !== undefined &&
+      this.currentLocationObj.longitude !== undefined;
+  };
 
   // animate() {
   //   let progress = 0;
@@ -396,21 +393,21 @@ hasValidLocation = () => {
    * Get employee details
    */
   getEmployeeDetails = async () => {
-  try {
-    const employeeDetails = await getData(LocalDBItems.employeeDetails);
-    if (!employeeDetails) {
-      throw new Error("Employee details not found");
+    try {
+      const employeeDetails = await getData(LocalDBItems.employeeDetails);
+      if (!employeeDetails) {
+        throw new Error("Employee details not found");
+      }
+      this.employeeDetails = { ...employeeDetails, isFaceVerified: false };
+      this.timer_error = true;
+      return employeeDetails;
+    } catch (error) {
+      console.error("Error fetching employee details:", error);
+      Alert.alert("Error", "Failed to load employee details");
+      this.props.navigation.goBack();
+      return null;
     }
-    this.employeeDetails = { ...employeeDetails, isFaceVerified: false };
-    this.timer_error = true;
-    return employeeDetails;
-  } catch (error) {
-    console.error("Error fetching employee details:", error);
-    Alert.alert("Error", "Failed to load employee details");
-    this.props.navigation.goBack();
-    return null;
-  }
-};
+  };
 
 
   /* For starting the timer and for the retry option, For the error stimulation we can change the timer to a lower value */
@@ -502,7 +499,7 @@ hasValidLocation = () => {
       params: params,
     }
     const apiResponseData = await apiService(requestObj);
-    console.log("apiResponseData:",apiResponseData);
+    console.log("apiResponseData:", apiResponseData);
     const emp_role_id = employeDetails.role_id;
     const section_id_data = apiResponseData.filter(item => item.section_id === '8a55082f-5185-4d28-9098-4f268cb47d51' && item.role_id === emp_role_id);
     console.log("Section_data", section_id_data)
@@ -697,10 +694,7 @@ hasValidLocation = () => {
   }
 
   flushtimer = () => {
-    if (timerId != null) {
-      clearTimeout(timerId);
-      // setTimerId(null);
-    }
+    addLog("Start button clicked - Beginning verification flow");
     this.verifyFaceRekcongition();
   };
 
@@ -713,88 +707,47 @@ hasValidLocation = () => {
    * @returns
    */
   verifyFaceRekcongition = async () => {
-console.log('[CheckIn] Starting verification process...');
-  
-  try {
-    // 1. Validate we have proper location data
-    if (!this.hasValidLocation()) {
-      console.warn('[CheckIn] Invalid location data');
-      Alert.alert(
-        'Location Error',
-        'Valid location is required for check-in'
-      );
-      return;
-    }
+    addLog("Starting face verification process");
 
-    // 2. For office check-ins, verify radius
-    if (this.state.isOffice) {
-      console.log('[CheckIn] Verifying office location...');
-      
-      try {
-        const isInRadius = await this.locationFetcher.isLocationInRadius();
-        console.log('[CheckIn] Office radius check result:', isInRadius);
-        
-        if (!isInRadius) {
-          Alert.alert(
-            'Location Mismatch',
-            'You must be within office premises to check in'
-          );
-          this.setState({ isLoading: false }); // Make sure to reset loading state
-          return;
-        }
-      } catch (error) {
-        console.error('[CheckIn] Office validation failed:', error);
-        Alert.alert(
-          'Validation Error',
-          'Could not verify office location'
-        );
-        this.setState({ isLoading: false }); // Reset loading state on error
-        return;
-      }
-    }
-
-    // 3. All validations passed - proceed with face verification
-    console.log('[CheckIn] All validations passed, starting face verification');
-    this.setState({ 
-      isVerifyFace: true,
-      isLoading: false 
+    this.setState({
+      showCameraLoader: true,
+      cameraReady: false,
+      isVerifyFace: true
     }, () => {
-      this.showTimerWhenFaceDetected();
+      addLog("State updated: Camera loader visible, verification started");
     });
 
-  } catch (error) {
-    console.error('[CheckIn] Verification failed:', error);
-    this.setState({ isLoading: false }); // Reset loading state on error
-    Alert.alert(
-      'Check-in Error',
-      'Failed to start check-in process'
-    );
-  }
-};
-
-
-//takes picture function
-  takePicture = async function () {
-    if (this.camera) {
-      let base64 = "";
-      await this.camera
-        .takePictureAsync({
-          base64: true,
-          quality: 0.5,
-        })
-        .then((data) => {
-          console.log("TakePicture", data.uri)
-          base64 = data.base64;
-          this.verifyFace(data.base64);
-          clearInterval(this.timer);
-        });
-      if (this.timer != null) {
-        clearInterval(this.timer);
+    try {
+      addLog("Checking location validity");
+      if (!this.hasValidLocation()) {
+        addLog("Location validation failed");
+        this.setState({ showCameraLoader: false });
+        Alert.alert('Location Error', 'Valid location is required');
+        return;
       }
+
+      if (this.state.isOffice) {
+        addLog("Checking office radius");
+        const isInRadius = await this.locationFetcher.isLocationInRadius();
+        addLog(`Office radius check result: ${isInRadius}`);
+
+        if (!isInRadius) {
+          addLog("Outside office radius");
+          this.setState({ showCameraLoader: false });
+          Alert.alert('Location Mismatch', 'You must be within office premises');
+          return;
+        }
+      }
+
+      addLog("All checks passed - proceeding to camera");
+    } catch (error) {
+      addLog(`Verification failed: ${error.message}`);
+      this.setState({ showCameraLoader: false });
     }
   };
 
-  handleSubmission=async()=>{
+
+  handleSubmission = async () => {
     const employeeDetails = await getData(LocalDBItems.employeeDetails);
     const full_name = `${employeeDetails.full_name} Reported the Face Error problem successfully`;
     Toast.show(full_name, Toast.LONG);
@@ -901,9 +854,9 @@ console.log('[CheckIn] Starting verification process...');
         filename,
         collection_id
       );
-      console.log(faceVerifyResult,"check face result")
+      console.log(faceVerifyResult, "check face result")
       const faceResult = faceVerifyResult.FaceMatches;
-      console.log(faceResult,"check face result 2")
+      console.log(faceResult, "check face result 2")
       console.log("counter face", counter_face_data)
       if (counter_face_data < 2) {
         if (
@@ -990,224 +943,238 @@ console.log('[CheckIn] Starting verification process...');
   /**
    * Add Time sheet API call after face is verified
    */
-  addTimesheetCheckIn = async () => {
-    let UUID = await getUUID()
-    let checkIsInRadius = false;
-    if (this.state.isOffice) {
-      checkIsInRadius = await this.locationFetcher.isLocationInRadius();
-    }
+addTimesheetCheckIn = async () => {
+    try {
+        let UUID = await getUUID();
+        let checkIsInRadius = false;
+        
+        // Check office radius if applicable
+        if (this.state.isOffice) {
+            checkIsInRadius = await this.locationFetcher.isLocationInRadius();
+        }
 
+        const {
+            manulLocation,
+            getSelectedProjectData,
+            selectedTab,
+            teamId,
+            teamMemberEmpId,
+            isOffice,
+            isWorkFromHome,
+            isManual,
+            organisationDetails,
+        } = this.state;
 
-    const {
-      manulLocation,
-      getSelectedProjectData,
-      selectedTab,
-      teamId,
-      locationName,
-      teamMemberEmpId,
-      manualAddress,
-      isOffice,
-      isWorkFromHome,
-      isManual,
-      wfhAddress,
-      organisationDetails,
-    } = this.state;
-    const employeeDetails = await getData(LocalDBItems.employeeDetails);
-    const locationtracking = await getData(LocalDBItems.isEmployeeLocationTrack)
-    console.log("Location tracking", locationtracking)
-    var timesheetSearchLocationViewModel = {};
-    var timesheetCategoryViewModel = {};
-    if (isOffice) {
-      this.isProject = false;
-      timesheetCategoryViewModel = {
-        project_category_type: "Office",
-        project_or_comp_id: organisationDetails.org_id,
-        project_or_comp_name: organisationDetails.org_name,
-        project_or_comp_type: null,
-      };
-      timesheetSearchLocationViewModel = {
-        manual_address: "",
-        geo_address: organisationDetails.entityLocation.geo_address,
-        formatted_address: organisationDetails.entityLocation.formatted_address,
-        lat: organisationDetails.entityLocation.lat,
-        lang: organisationDetails.entityLocation.lang,
-        street_number: organisationDetails.entityLocation.street_number,
-        route: organisationDetails.entityLocation.route,
-        locality: organisationDetails.entityLocation.locality,
-        administrative_area_level_2:
-          organisationDetails.entityLocation.administrative_area_level_2,
-        administrative_area_level_1:
-          organisationDetails.entityLocation.administrative_area_level_1,
-        postal_code: organisationDetails.entityLocation.postal_code,
-        country: organisationDetails.entityLocation.country,
-        is_office: true,
-        is_manual: false,
-        is_wfh: false,
-      };
-    } else if (isWorkFromHome) {
-      timesheetCategoryViewModel = {
-        project_category_type: "Place",
-        project_or_comp_id: null,
-        project_or_comp_name: this.currentLocationObj.formatted_address,
-        project_or_comp_type: null,
-      };
-      timesheetSearchLocationViewModel = {
-        manual_address: "",
-        geo_address: this.currentLocationObj.formatted_address,
-        formatted_address: this.currentLocationObj.formatted_address,
-        lat: this.currentLocationObj.latitude,
-        lang: this.currentLocationObj.longitude,
-        street_number: this.currentLocationObj.street_number,
-        route: this.currentLocationObj.route,
-        locality: this.currentLocationObj.locality,
-        administrative_area_level_2: this.currentLocationObj
-          .administrative_area_level_2,
-        administrative_area_level_1: this.currentLocationObj
-          .administrative_area_level_1,
-        postal_code: this.currentLocationObj.postal_code,
-        country: this.currentLocationObj.country,
-        is_office: false,
-        is_manual: false,
-        is_wfh: true,
-      };
-      checkIsInRadius = true;
-    } else if (isManual) {
-      timesheetCategoryViewModel = {
-        project_category_type: "Place",
-        project_or_comp_id: null,
-        project_or_comp_name: manulLocation,
-        project_or_comp_type: null,
-      };
-      timesheetSearchLocationViewModel = {
-        manual_address: manulLocation,
-        geo_address: this.currentLocationObj.formatted_address,
-        formatted_address: this.currentLocationObj.formatted_address,
-        lat: this.currentLocationObj.latitude,
-        lang: this.currentLocationObj.longitude,
-        street_number: this.currentLocationObj.street_number,
-        route: this.currentLocationObj.route,
-        locality: this.currentLocationObj.locality,
-        administrative_area_level_2: this.currentLocationObj
-          .administrative_area_level_2,
-        administrative_area_level_1: this.currentLocationObj
-          .administrative_area_level_1,
-        postal_code: this.currentLocationObj.postal_code,
-        country: this.currentLocationObj.country,
-        is_office: false,
-        is_manual: true,
-        is_wfh: false,
-      };
-    } else {
-      if (this.state.selectedTab === 2) {
-        timesheetCategoryViewModel = {
-          project_category_type: "Place",
-          project_or_comp_id: null,
-          project_or_comp_name: this.currentLocationObj.formatted_address,
-          project_or_comp_type: "",
+        const employeeDetails = await getData(LocalDBItems.employeeDetails);
+        const locationtracking = await getData(LocalDBItems.isEmployeeLocationTrack);
+        
+        // Prepare view models based on check-in type
+        let timesheetSearchLocationViewModel = {};
+        let timesheetCategoryViewModel = {};
+        
+        if (isOffice) {
+            this.isProject = false;
+            timesheetCategoryViewModel = {
+                project_category_type: "Office",
+                project_or_comp_id: organisationDetails.org_id,
+                project_or_comp_name: organisationDetails.org_name,
+                project_or_comp_type: null,
+            };
+
+            timesheetSearchLocationViewModel = {
+                manual_address: "",
+                geo_address: organisationDetails.entityLocation.geo_address,
+                formatted_address: organisationDetails.entityLocation.formatted_address,
+                lat: organisationDetails.entityLocation.lat,
+                lang: organisationDetails.entityLocation.lang,
+                street_number: organisationDetails.entityLocation.street_number,
+                route: organisationDetails.entityLocation.route,
+                locality: organisationDetails.entityLocation.locality,
+                administrative_area_level_2: organisationDetails.entityLocation.administrative_area_level_2,
+                administrative_area_level_1: organisationDetails.entityLocation.administrative_area_level_1,
+                postal_code: organisationDetails.entityLocation.postal_code,
+                country: organisationDetails.entityLocation.country,
+                is_office: true,
+                is_manual: false,
+                is_wfh: false,
+            };
+        } else if (isWorkFromHome) {
+            timesheetCategoryViewModel = {
+                project_category_type: "Place",
+                project_or_comp_id: null,
+                project_or_comp_name: this.currentLocationObj.formatted_address,
+                project_or_comp_type: null,
+            };
+
+            timesheetSearchLocationViewModel = {
+                manual_address: "",
+                geo_address: this.currentLocationObj.formatted_address,
+                formatted_address: this.currentLocationObj.formatted_address,
+                lat: this.currentLocationObj.latitude,
+                lang: this.currentLocationObj.longitude,
+                street_number: this.currentLocationObj.street_number,
+                route: this.currentLocationObj.route,
+                locality: this.currentLocationObj.locality,
+                administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
+                administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
+                postal_code: this.currentLocationObj.postal_code,
+                country: this.currentLocationObj.country,
+                is_office: false,
+                is_manual: false,
+                is_wfh: true,
+            };
+            checkIsInRadius = true;
+        } else if (isManual) {
+            timesheetCategoryViewModel = {
+                project_category_type: "Place",
+                project_or_comp_id: null,
+                project_or_comp_name: manulLocation,
+                project_or_comp_type: null,
+            };
+            timesheetSearchLocationViewModel = {
+                manual_address: manulLocation,
+                geo_address: this.currentLocationObj.formatted_address,
+                formatted_address: this.currentLocationObj.formatted_address,
+                lat: this.currentLocationObj.latitude,
+                lang: this.currentLocationObj.longitude,
+                street_number: this.currentLocationObj.street_number,
+                route: this.currentLocationObj.route,
+                locality: this.currentLocationObj.locality,
+                administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
+                administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
+                postal_code: this.currentLocationObj.postal_code,
+                country: this.currentLocationObj.country,
+                is_office: false,
+                is_manual: true,
+                is_wfh: false,
+            };
+        } else {
+            if (this.state.selectedTab === 2) {
+                timesheetCategoryViewModel = {
+                    project_category_type: "Place",
+                    project_or_comp_id: null,
+                    project_or_comp_name: this.currentLocationObj.formatted_address,
+                    project_or_comp_type: "",
+                };
+                timesheetSearchLocationViewModel = {
+                    manual_address: "",
+                    geo_address: this.currentLocationObj.formatted_address,
+                    formatted_address: this.currentLocationObj.formatted_address,
+                    lat: this.currentLocationObj.latitude,
+                    lang: this.currentLocationObj.longitude,
+                    street_number: this.currentLocationObj.street_number,
+                    route: this.currentLocationObj.route,
+                    locality: this.currentLocationObj.locality,
+                    administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
+                    administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
+                    postal_code: this.currentLocationObj.postal_code,
+                    country: this.currentLocationObj.country,
+                    is_office: false,
+                    is_manual: false,
+                    is_wfh: false,
+                };
+            } else {
+                timesheetCategoryViewModel = {
+                    project_category_type: "Job",
+                    project_or_comp_id: getSelectedProjectData.project_id,
+                    project_or_comp_name: getSelectedProjectData.project_name,
+                    project_or_comp_type: "",
+                };
+                timesheetSearchLocationViewModel = null;
+            }
+            this.isProject = !!getSelectedProjectData.project_id;
+            this.state.isOffice = false;
+        }
+
+        // Prepare parameters for API call
+        const params = {
+            team_member_empid: teamMemberEmpId,
+            teamid: teamId,
+            check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+            is_app_check_In: true,
+            checkin_tag_id: UUID,
+            is_app_version: version.version,
+            createdby: employeeDetails.full_name,
+            checkin_user_empid: employeeDetails.id,
+            is_inrange: checkIsInRadius,
+            timesheetCategoryViewModel: timesheetCategoryViewModel,
+            timesheetSearchLocationViewModel: timesheetSearchLocationViewModel,
+            timesheetCurrentLocationViewModel: {
+                geo_address: this.currentLocationObj.formatted_address,
+                formatted_address: this.currentLocationObj.formatted_address,
+                lat: this.currentLocationObj.latitude,
+                lang: this.currentLocationObj.longitude,
+                street_number: this.currentLocationObj.street_number,
+                route: this.currentLocationObj.route,
+                locality: this.currentLocationObj.locality,
+                administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
+                administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
+                postal_code: this.currentLocationObj.postal_code,
+                country: this.currentLocationObj.country,
+            },
         };
-        timesheetSearchLocationViewModel = {
-          manual_address: "",
-          geo_address: this.currentLocationObj.formatted_address,
-          formatted_address: this.currentLocationObj.formatted_address,
-          lat: this.currentLocationObj.latitude,
-          lang: this.currentLocationObj.longitude,
-          street_number: this.currentLocationObj.street_number,
-          route: this.currentLocationObj.route,
-          locality: this.currentLocationObj.locality,
-          administrative_area_level_2: this.currentLocationObj
-            .administrative_area_level_2,
-          administrative_area_level_1: this.currentLocationObj
-            .administrative_area_level_1,
-          postal_code: this.currentLocationObj.postal_code,
-          country: this.currentLocationObj.country,
-          is_office: false,
-          is_manual: false,
-          is_wfh: false,
-        };
-      } else {
-        timesheetCategoryViewModel = {
-          project_category_type: "Job",
-          project_or_comp_id: getSelectedProjectData.project_id,
-          project_or_comp_name: getSelectedProjectData.project_name,
-          project_or_comp_type: "",
-        };
-        timesheetSearchLocationViewModel = null;
-      }
-      if (getSelectedProjectData.project_id) {
-        this.isProject = true;
-      } else {
-        this.isProject = false;
-      }
-      this.state.isOffice = false;
-    }
 
+        // Make API call
+        const requestObj = {
+            endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_TIMESHEET_CHECKIN,
+            type: "post",
+            params: params,
+        };
+        
+        const apiResponseData = await apiService(requestObj);
+        
+        if (apiResponseData.status == "200") {
+            // Clear any existing timers
+            if (this.timer != null) {
+                clearInterval(this.timer);
+            }
 
-    const params = {
-      team_member_empid: teamMemberEmpId,
-      teamid: teamId,
-      check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-      is_app_check_In: true,
-      checkin_tag_id:this.UUID,
-      is_app_version: version.version,
-      createdby: employeeDetails.full_name,
-      checkin_user_empid: employeeDetails.id,
-      is_inrange: checkIsInRadius,
-      timesheetCategoryViewModel: timesheetCategoryViewModel,
-      timesheetSearchLocationViewModel: timesheetSearchLocationViewModel,
-      timesheetCurrentLocationViewModel: {
-        geo_address: this.currentLocationObj.formatted_address,
-        formatted_address: this.currentLocationObj.formatted_address,
-        lat: this.currentLocationObj.latitude,
-        lang: this.currentLocationObj.longitude,
-        street_number: this.currentLocationObj.street_number,
-        route: this.currentLocationObj.route,
-        locality: this.currentLocationObj.locality,
-        administrative_area_level_2: this.currentLocationObj
-          .administrative_area_level_2,
-        administrative_area_level_1: this.currentLocationObj
-          .administrative_area_level_1,
-        postal_code: this.currentLocationObj.postal_code,
-        country: this.currentLocationObj.country,
-      },
-    };
-    console.log("Parms Data",params);
-    const requestObj = {
-      endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_TIMESHEET_CHECKIN,
-      type: "post",
-      params: params,
-    };
-    const apiResponseData = await apiService(requestObj);
-    console.log("responseData", apiResponseData)
-    if (apiResponseData.status == "200") {
-      if (this.timer != null) {
-        clearInterval(this.timer);
-      }
-      const checkInCheckOutData = {
-        checkin_out_project: params.timesheetCategoryViewModel.project_or_comp_name,
-        checkin_out_jobType: params.timesheetCategoryViewModel.project_category_type
-      }
-      const checkinInfo = {
-        isOfficeChecin: this.state.isOffice,
-        isProjectCheckin: this.isProject,
-      };
-      storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData)
-      storeData(LocalDBItems.checkInInfo, checkinInfo);
-      if (locationtracking == false) {
-        console.log(" Am stuck here help me");
-        storeData(LocalDBItems.isEmployeeLocationTrack, false);
-        this.locationFetcher.removeLocationUpdate();
-      } else {
-        console.log(" Am stuck  me");
-        storeData(LocalDBItems.isEmployeeLocationTrack, true); //
-      }
-      this.onGoBackToPrevious();
-      this.props.navigation.goBack();
-      this.props.route.params.onGoBack();
-      const employeeDetails = await getData(LocalDBItems.employeeDetails);
-      const full_name = `${employeeDetails.full_name} checked in successfully`;
-      Toast.show(full_name, Toast.LONG);
+            // Store check-in data
+            const checkInCheckOutData = {
+                checkin_out_project: params.timesheetCategoryViewModel.project_or_comp_name,
+                checkin_out_jobType: params.timesheetCategoryViewModel.project_category_type
+            };
+            const checkinInfo = {
+                isOfficeChecin: this.state.isOffice,
+                isProjectCheckin: this.isProject,
+            };
+            
+            await storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData);
+            await storeData(LocalDBItems.checkInInfo, checkinInfo);
+            
+            // Handle location tracking
+            if (locationtracking) {
+                await storeData(LocalDBItems.isEmployeeLocationTrack, true);
+            } else {
+                await storeData(LocalDBItems.isEmployeeLocationTrack, false);
+                this.locationFetcher.removeLocationUpdate();
+            }
+
+            // Navigate to HomeScreen with refresh parameters
+            this.props.navigation.navigate('Home', {
+                refresh: true,
+                checkInLocation: this.currentLocationObj,
+                checkInTime: params.check_in,
+                isNewCheckIn: true
+            });
+
+            // Show success message
+            const full_name = `${employeeDetails.full_name} checked in successfully`;
+            Toast.show(full_name, Toast.LONG);
+        } else {
+            throw new Error(apiResponseData.message || "Check-in failed");
+        }
+    } catch (error) {
+        console.error("Check-in error:", error);
+        Toast.show(error.message || "Check-in failed", Toast.LONG);
+        
+        // Re-enable UI elements if needed
+        this.setState({
+            showCameraLoader: false,
+            isVerifyFace: false
+        });
     }
-  };
+};
 
   /**
  * Add Time sheet API call after face is verified when forcecheckin
@@ -1361,13 +1328,13 @@ console.log('[CheckIn] Starting verification process...');
       }
       this.state.isOffice = false;
     }
-    console.log(UUID,"UUID");
+    console.log(UUID, "UUID");
     const params = {
       team_member_empid: teamMemberEmpId,
       teamid: teamId,
       check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
       is_app_check_In: true,
-      checkin_tag_id:this.UUID,
+      checkin_tag_id: this.UUID,
       is_app_version: version.version,
       createdby: employeeDetails.full_name,
       checkin_user_empid: employeeDetails.id,
@@ -1390,7 +1357,7 @@ console.log('[CheckIn] Starting verification process...');
         country: this.currentLocationObj.country,
       },
     };
-    console.log("Parms Data",params);
+    console.log("Parms Data", params);
     const requestObj = {
       endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_TIMESHEET_CHECKIN,
       type: "post",
@@ -1442,8 +1409,8 @@ console.log('[CheckIn] Starting verification process...');
         return this.state.caseColors;
       case 2:
         return this.state.placeColors;
-        default:
-          return ["#ffffff"]; 
+      default:
+        return ["#ffffff"];
     }
   };
   /**
@@ -1747,9 +1714,11 @@ console.log('[CheckIn] Starting verification process...');
       console.log(" Am stuck  me");
       storeData(LocalDBItems.isEmployeeLocationTrack, true); //
     }
+
     this.onGoBackToPrevious();
     this.props.navigation.goBack();
     this.props.route.params.onGoBack();
+
     const employeeDetails = await getData(LocalDBItems.employeeDetails);
     const full_name = `${employeeDetails.full_name} Force checked in successfully`;
     Toast.show(full_name, Toast.LONG);
@@ -1763,33 +1732,33 @@ console.log('[CheckIn] Starting verification process...');
     try {
       const orgId = await getData(LocalDBItems.employeeDetails);
       const organisationDetails = await getData(LocalDBItems.organizationDetails);
-  
+
       const params = { id: orgId.org_id };
       const requestObj = {
         endpoint: BaseUrl.API_BASE_URL + Endpoint.FETCHALL_PROJECTBY_ORGID,
         type: "post",
         params,
       };
-  
+
       const apiResponseData = await apiService(requestObj);
       if (!apiResponseData) throw new Error("No API response");
-  
+
       const getProjectData = JSON.parse(apiResponseData);
       const projectName = getProjectData.map((value) => ({
         ...value,
         label: value.project_name,
         value: value.project_name,
       }));
-  
+
       const officeAddress = {
         ...organisationDetails,
         label: organisationDetails.org_name,
         value: organisationDetails.org_id,
       };
-  
+
       const employeeTeam = [...this.state.teamMemberEmpId, orgId.id];
       const officeArray = [{ label: officeAddress.org_name, value: 0 }]; // Using index 0 since only 1 org
-  
+
       this.setState({
         getAllProjectData: getProjectData,
         getProjectList: projectName,
@@ -1798,13 +1767,13 @@ console.log('[CheckIn] Starting verification process...');
         selectedOfficeValue: officeArray.length > 0 ? officeArray[0].value : null,
         teamMemberEmpId: employeeTeam,
       });
-  
+
     } catch (error) {
       console.error("fetchAllProjectByOrgID failed:", error);
       // Optionally: Update state to show error UI
     }
   };
-  
+
   onPressFindTeamByOrgID = async () => {
     if (!this.state.isTeamClicked) {
       this.setState({ isTeamClicked: true });
@@ -2694,109 +2663,36 @@ console.log('[CheckIn] Starting verification process...');
 
   //render camera
   renderCamera() {
-    const { canDetectFaces } = this.state;
+    addLog("Rendering FaceRecognitionCamera component");
     return (
-      <RNCamera
-        ref={(ref) => {
-          this.camera = ref;
+      <FaceRecognitionCamera
+        onPhotoTaken={this.handlePhotoTaken}
+        onDismiss={this.dismissAndGoBack}
+        onCameraReady={() => {
+          addLog("Camera component mounted and ready");
+          this.setState({ cameraReady: true });
         }}
-        style={{
-          flex: 1,
-          justifyContent: "space-between",
+        onCameraError={(error) => {
+          addLog(`Camera error: ${error}`);
         }}
-        type={this.state.type}
-        flashMode={this.state.flash}
-        autoFocus={this.state.autoFocus}
-        zoom={this.state.zoom}
-        whiteBalance={this.state.whiteBalance}
-        ratio={this.state.ratio}
-        focusDepth={this.state.depth}
-        captureAudio={false}
-        androidCameraPermissionOptions={{
-          title: "Permission to use camera",
-          message: "We need your permission to use your camera",
-          buttonPositive: "Ok",
-          buttonNegative: "Cancel",
-        }}
-        faceDetectionLandmarks={
-          RNCamera.Constants.FaceDetection.Landmarks
-            ? RNCamera.Constants.FaceDetection.Landmarks.all
-            : undefined
-        }
-        onFacesDetected={canDetectFaces ? this.facesDetected : undefined}
-        faceDetectionMode={
-          RNCamera.Constants.FaceDetection.Mode
-            ? RNCamera.Constants.FaceDetection.Mode.accurate
-            : undefined
-        }
-        faceDetectionClassifications={
-          RNCamera.Constants.FaceDetection.Classifications
-            ? RNCamera.Constants.FaceDetection.Classifications.all
-            : undefined
-        }
-      //onFaceDetectionError={this.onFaceDetectionError}
-      >
-        <View
-          style={{
-            //flex: 0.5,
-            width: "80%",
-            height: 80,
-            backgroundColor: "transparent",
-            flexDirection: "row",
-            marginLeft: 24,
-          }}
-        >
-          <TouchableOpacity
-            style={{
-              width: 60,
-              marginTop: 50,
-              backgroundColor: "transparent",
-              justifyContent: "center",
-              flexDirection: "row",
-              alignItems: "center",
-            }}
-            onPress={() => this.dismissAndGoBack()}
-          >
-            <Icon name="angle-left" size={30} color="white" />
-            <Text style={[styles.flipText, { paddingLeft: 15 }]}>Back</Text>
-          </TouchableOpacity>
-        </View>
-        {!this.faceDetectedOrNot && (
-          <View
-            style={{
-              justifyContent: "center",
-              alignSelf: "center",
-              top: 100,
-              backgroundColor: "black",
-              opacity: 0.5,
-              position: "absolute",
-            }}
-          >
-            <Text style={[styles.flipText, { fontSize: 15 }]}>
-              {this.faceDetectedOrNot ? "" : "No person detected."}
-            </Text>
-          </View>
-        )}
-        <View style={styles.cameraFaceContainer}>
-          <View style={{ flex: 1 }}>
-            <Image
-              style={styles.CameraFaceIcon}
-              source={Images.defaultFaceMaskIcon}
-              resizeMode={"contain"}
-            />
-
-            <View style={{ flex: 1, alignSelf: 'center', justifyContent: 'center' }} >
-              <Progress.Bar color={'#fff'} indeterminate={this.state.indeterminate} progress={this.state.progress} width={350} />
-            </View>
-
-
-          </View>
-        </View>
-        {/* {canDetectFaces && this.renderFaces()} */}
-        {canDetectFaces && this.renderLandmarks()}
-      </RNCamera>
+      />
     );
   }
+
+  handlePhotoTaken = async (base64Photo) => {
+    addLog("Photo captured successfully");
+    try {
+      if (this.state.isGroupVerifyClicked) {
+        addLog("Processing group verification");
+        await this.verifyGroupCheckin(base64Photo);
+      } else {
+        addLog("Processing individual verification");
+        await this.verifyFace(base64Photo);
+      }
+    } catch (error) {
+      addLog(`Photo processing failed: ${error}`);
+    }
+  };
 
 
   // Face detection
@@ -3055,40 +2951,40 @@ console.log('[CheckIn] Starting verification process...');
         </View>
       </View>
     )
-  } 
-  
-  onChoosePlaceOffice = async (value) => {
-  console.log("Starting office location validation...");
-  
-  try {
-    const isInRadius = await this.locationFetcher.isLocationInRadius();
-    console.log('Office radius validation result:', isInRadius);
-    
-    this.isAllowtocheckin = isInRadius;
-    this.setState({
-      isOffice: isInRadius, // Only set to true if in radius
-      isWorkFromHome: false,
-      isManual: false,
-      isPlace: false,
-    });
-
-    if (!isInRadius) {
-      Alert.alert(
-        'Location Mismatch',
-        'You are not within the office premises'
-      );
-    }
-  } catch (error) {
-    console.error('Office location validation failed:', error);
-    this.isAllowtocheckin = false;
-    this.setState({
-      isOffice: false,
-      isWorkFromHome: false,
-      isManual: false,
-      isPlace: false,
-    });
   }
-};
+
+  onChoosePlaceOffice = async (value) => {
+    console.log("Starting office location validation...");
+
+    try {
+      const isInRadius = await this.locationFetcher.isLocationInRadius();
+      console.log('Office radius validation result:', isInRadius);
+
+      this.isAllowtocheckin = isInRadius;
+      this.setState({
+        isOffice: isInRadius, // Only set to true if in radius
+        isWorkFromHome: false,
+        isManual: false,
+        isPlace: false,
+      });
+
+      if (!isInRadius) {
+        Alert.alert(
+          'Location Mismatch',
+          'You are not within the office premises'
+        );
+      }
+    } catch (error) {
+      console.error('Office location validation failed:', error);
+      this.isAllowtocheckin = false;
+      this.setState({
+        isOffice: false,
+        isWorkFromHome: false,
+        isManual: false,
+        isPlace: false,
+      });
+    }
+  };
   onChoosePlaceWrkFrmHome = (value) => {
     this.isAllowtocheckin = true;
     this.setState({
@@ -3156,50 +3052,50 @@ console.log('[CheckIn] Starting verification process...');
           onChoosePlace={(value) => this.onChoosePlace(value)}
           isPlace={this.state.isPlace}
         />
-          {this.state.isOffice && !this.state.isPlace && this.state.officeAddressPlace.length > 0 ? (
-            <DropDownPicker
-  open={this.state.dropdownOpen}
-  value={this.state.selectedOfficeValue}
-  items={this.state.officeAddressPlace}
-  setOpen={(open) => this.setState({ dropdownOpen: open })}
-  setValue={(callback) => {
-    const value = callback(this.state.selectedOfficeValue);
-    const selectedItem = this.state.officeAddressPlace.find(item => item.value === value);
-    const index = this.state.officeAddressPlace.findIndex(item => item.value === value);
-    this.setState({ selectedOfficeValue: value });
-    this.onSelectOfficeLocation(selectedItem, index);
-  }}
-  setItems={(items) => this.setState({ officeAddressPlace: items })}
-  placeholder="Select office"
-  searchable={true}
-  searchPlaceholder="Search for office"
-  containerStyle={{
-    height: 60,
-    width: '90%',
-    alignSelf: 'center',
-    marginTop: 20,
-  }}
-  style={[
-    styles.dropDownContainer,
-    { marginTop: 5, backgroundColor: 'lightgrey' },
-  ]}
-  dropDownContainerStyle={{
-    backgroundColor: '#fcfcfc',
-    zIndex: 10000,
-  }}
-  textStyle={{
-    fontSize: 16,
-    color: '#000',
-  }}
-/>
+        {this.state.isOffice && !this.state.isPlace && this.state.officeAddressPlace.length > 0 ? (
+          <DropDownPicker
+            open={this.state.dropdownOpen}
+            value={this.state.selectedOfficeValue}
+            items={this.state.officeAddressPlace}
+            setOpen={(open) => this.setState({ dropdownOpen: open })}
+            setValue={(callback) => {
+              const value = callback(this.state.selectedOfficeValue);
+              const selectedItem = this.state.officeAddressPlace.find(item => item.value === value);
+              const index = this.state.officeAddressPlace.findIndex(item => item.value === value);
+              this.setState({ selectedOfficeValue: value });
+              this.onSelectOfficeLocation(selectedItem, index);
+            }}
+            setItems={(items) => this.setState({ officeAddressPlace: items })}
+            placeholder="Select office"
+            searchable={true}
+            searchPlaceholder="Search for office"
+            containerStyle={{
+              height: 60,
+              width: '90%',
+              alignSelf: 'center',
+              marginTop: 20,
+            }}
+            style={[
+              styles.dropDownContainer,
+              { marginTop: 5, backgroundColor: 'lightgrey' },
+            ]}
+            dropDownContainerStyle={{
+              backgroundColor: '#fcfcfc',
+              zIndex: 10000,
+            }}
+            textStyle={{
+              fontSize: 16,
+              color: '#000',
+            }}
+          />
 
-          ) : (
-            <LocationText
-              locationName={this.getLocationName()}
-              isEditabe={this.state.isManual}
-              setLocationName={(text) => this.setLocationName(text)}
-            />
-          )}
+        ) : (
+          <LocationText
+            locationName={this.getLocationName()}
+            isEditabe={this.state.isManual}
+            setLocationName={(text) => this.setLocationName(text)}
+          />
+        )}
 
         {isPlace && (
           <MapViewEnforce
@@ -3245,39 +3141,39 @@ console.log('[CheckIn] Starting verification process...');
     let locationName = this.currentLocationObj;
 
     if (this.state.isLocationFetcherRequired) {
-  try {
-      if (this.currentLocationObj.formatted_address === "" || Platform.OS === 'ios') {
-        locationName = await this.geoCoder.getPlaceFromCordinate(
-          locationObj.latitude,
-          locationObj.longitude
-        );
-      }
-      this.currentLocationObj = locationName;
-      console.log('locationName--->', locationName);
-      const newCordObj = {
-        longitude: locationObj.longitude,
-        latitude: locationObj.latitude,
-      };
-      this.cordinateObj = newCordObj;
-      if (!this.state.isManual) {
-        this.setState({
-          locationName: this.currentLocationObj.formatted_address || 'Current Location',
-          isInitialLoad: false,
-          isLoading: false,
-        });
-      }
- } catch (error) {
-      console.error('Error getting location:', error);
-      if (Platform.OS === 'ios') {
-        this.setState({
-          locationName: 'Current Location',
-          isInitialLoad: false,
-          isLoading: false,
-        });
+      try {
+        if (this.currentLocationObj.formatted_address === "" || Platform.OS === 'ios') {
+          locationName = await this.geoCoder.getPlaceFromCordinate(
+            locationObj.latitude,
+            locationObj.longitude
+          );
+        }
+        this.currentLocationObj = locationName;
+        console.log('locationName--->', locationName);
+        const newCordObj = {
+          longitude: locationObj.longitude,
+          latitude: locationObj.latitude,
+        };
+        this.cordinateObj = newCordObj;
+        if (!this.state.isManual) {
+          this.setState({
+            locationName: this.currentLocationObj.formatted_address || 'Current Location',
+            isInitialLoad: false,
+            isLoading: false,
+          });
+        }
+      } catch (error) {
+        console.error('Error getting location:', error);
+        if (Platform.OS === 'ios') {
+          this.setState({
+            locationName: 'Current Location',
+            isInitialLoad: false,
+            isLoading: false,
+          });
+        }
       }
     }
-  }
-};
+  };
   isInRadius = (isInRadius) => { };
   renderTeamsView() {
     const { getAllTeamData, teamMultipleSelect } = this.state;
@@ -3405,9 +3301,13 @@ console.log('[CheckIn] Starting verification process...');
     this.setState({ isViewDecription: false });
   };
   isInRadius = (isInRadius) => { };
+
+
   onGoBackToPrevious = async () => {
     this.props.navigation.goBack();
   };
+
+
   onGoBackToPreviousCheckIn = async () => {
     counter++;
     console.log(counter);
@@ -3444,7 +3344,7 @@ console.log('[CheckIn] Starting verification process...');
             isInRadiusOrNot={(isInRadius) => this.isInRadius(isInRadius)}
             isInitialLoad={this.state.isInitialLoad}
           />
-          <Loader loading={isLoading} />
+          {/* <Loader loading={isLoading} /> */}
           {this.renderRegistrationSuccessPopup()}
           {this.renderCamera()}
         </View>
@@ -3465,7 +3365,7 @@ console.log('[CheckIn] Starting verification process...');
             isInRadiusOrNot={(isInRadius) => this.isInRadius(isInRadius)}
             isInitialLoad={this.state.isInitialLoad}
           />
-          
+
           <LinearGradient
             start={{ x: 0.5, y: 1.0 }}
             end={{ x: 0.0, y: 0.25 }}
@@ -3496,7 +3396,7 @@ console.log('[CheckIn] Starting verification process...');
             end={{ x: 0.0, y: 0.25 }}
             colors={this.getNavigationColor()}
           >
-          
+
           </LinearGradient>
           <ScrollView
             contentContainerStyle={{ paddingBottom: 60 }}
