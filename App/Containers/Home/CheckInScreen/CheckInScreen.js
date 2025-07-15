@@ -1151,7 +1151,7 @@ addTimesheetCheckIn = async () => {
             }
 
             // Navigate to HomeScreen with refresh parameters
-            this.props.navigation.navigate('Home', {
+            this.props.navigation.navigate('HomeScreen', {
                 refresh: true,
                 checkInLocation: this.currentLocationObj,
                 checkInTime: params.check_in,
