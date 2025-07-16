@@ -1729,7 +1729,7 @@ getCurrentLocation = () => {
             }}
             onPress={() => this.showLogoutPopup()}
           >
-            <Icon name="logout" size={25} color="white" />
+            <Icon name="logout" size={30} color="white" />
           </TouchableOpacity>
         </LinearGradient>
         <View

@@ -8375,11 +8375,6 @@ react-native-vector-icons@^10.2.0:
     prop-types "^15.7.2"
     yargs "^16.1.1"
 
-react-native-vision-camera-face-detector@^1.8.6:
-  version "1.8.6"
-  resolved "https://registry.npmjs.org/react-native-vision-camera-face-detector/-/react-native-vision-camera-face-detector-1.8.6.tgz"
-  integrity sha512-2BV8wQI+EYCRY6rsPaWypUDcw/aslEQqr595kanjQUgniEpjdZ2JN2yrN1uLmXW84kHa9+cINMgXkQasCX4i7w==
-
 react-native-vision-camera@^4.7.0:
   version "4.7.0"
   resolved "https://registry.npmjs.org/react-native-vision-camera/-/react-native-vision-camera-4.7.0.tgz"

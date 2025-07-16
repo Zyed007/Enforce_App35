@@ -1,3 +1,4 @@
+// File: src/Screens/PermissionScreen.js
 import * as React from "react";
 import {
   AppState,
@@ -6,6 +7,7 @@ import {
   Image,
   TouchableOpacity,
   Linking,
+  Platform,
 } from "react-native";
 import styles from "./style";
 import { Helpers, Images } from "../../Theme";
@@ -16,10 +18,8 @@ import {
   request,
   PERMISSIONS,
   RESULTS,
-  requestMultiple,
 } from "react-native-permissions";
-import { Platform } from "react-native";
-import AndroidGeolocation from "../LocationModule/AndroidGeolocation"
+import AndroidGeolocation from "../LocationModule/AndroidGeolocation";
 import LocationFetcher from "../LocationModule/index";
 import PermissionDeniedModal from "../../Components/PermissionDeniedModal";
 import { getData, LocalDBItems, storeData } from "../../Services/LocalStorage";
@@ -29,13 +29,6 @@ import {
   checkAllPermison,
 } from "../../Components/PermissionChecker";
 
-/**
- * PERMISSION
- * After user login, navigated to permission screen
- * User can enable the camera and location tracking permission from the screen.
- * After enabling only user can navigate to register face screen.
- * Only one time the permission screen will be shown to user.
- */
 export default class PermissionScreen extends React.Component {
   constructor(props) {
     super(props);
@@ -46,28 +39,12 @@ export default class PermissionScreen extends React.Component {
       appState: AppState.currentState,
       showPermissionDeniedModal: false,
     };
-    this.permisonIOSArray = [
-      PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
-      PERMISSIONS.IOS.LOCATION_ALWAYS,
-      PERMISSIONS.IOS.CAMERA,
-    ];
-    this.permssionAndroidArray = [
-      PERMISSIONS.ANDROID.ACCESS_BACKGROUND_LOCATION,
-    ];
   }
-  /**
-   * componentDidMount function called when user enters the screen
-   * Added on change notification to receive app changes
-   */
+
   componentDidMount = () => {
-    AppState.addEventListener("change", this._handleAppStateChange);
     this.checkPermissions();
   };
-  /**
-   * _handleAppStateChange function called when user enters the screen
-   * to detect the app state change
-   * permission check added
-   */
+
   _handleAppStateChange = (nextAppState) => {
     if (
       this.state.appState.match(/inactive|background/) &&
@@ -78,28 +55,19 @@ export default class PermissionScreen extends React.Component {
     this.setState({ appState: nextAppState });
   };
 
-  /**
-   * checkPermissions function called to check permission
-   */
-  checkPermissions = () => {
-    isCameraPermisonGranted().then((result) => {
-      this.setState({ cameraPermission: result.granted });
-    });
-    isLocationPermisonGranted().then((result) => {
-      this.setState({ locationPermission: result.granted });
-    });
-
-    checkAllPermison().then((result) => {
-      this.setState({ showPermissionDeniedModal: false });
-    });
+  checkPermissions = async () => {
+    const camera = await isCameraPermisonGranted();
+    const location = await isLocationPermisonGranted();
+    this.setState(prev => ({
+      ...prev,
+      cameraPermission: camera.granted,
+      locationPermission: location.granted,
+      showPermissionDeniedModal: false,
+    }));
   };
 
-  /**
-   * componentWillUnmount function called to when the component removed from the stack
-   * Navigation added to the FaceRegistrationIntoScreen screen
-   */
+  componentWillUnmount() {}
 
-  componentWillUnmount() { }
   navigateToFaceRegistrationScreen = async () => {
     const employeeDetails = await getData(LocalDBItems.employeeDetails);
     if (employeeDetails.is_face_recog) {
@@ -110,168 +78,104 @@ export default class PermissionScreen extends React.Component {
     }
   };
 
-  /**
-   * To request location permission of the user
-   */
   requestLocationPermission = () => {
-  if (Platform.OS === "ios") {
-    // First request LOCATION_WHEN_IN_USE
-    request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE)
-      .then((result) => {
-        console.log("iOS LOCATION_WHEN_IN_USE permission result:", result);
-        if (result === RESULTS.GRANTED) {
-          this.setState({ locationPermission: true });
-        } else if (result === RESULTS.BLOCKED || result === RESULTS.DENIED) {
-          this.setState({ showPermissionDeniedModal: true });
-        }
-      })
-      .catch((error) => {
-        console.error("iOS location permission request error:", error);
-      });
-  } else {
-    // Android flow
-    request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION, {
-      title: 'Allow Enforce to access this device location',
-      message: 'Enforce App collects location data to enable Travel Claim when selecting place checkin even when the app is closed or not in use',
-      buttonPositive: 'Accept',
-      buttonNegative: 'Cancel'
-    })
-      .then((fineResult) => {
-        if (fineResult === "granted") {
-          // Then request background location
-          request(PERMISSIONS.ANDROID.ACCESS_BACKGROUND_LOCATION, {
-            title: 'Allow Enforce to access your location in the background',
-            message: 'Background location is needed to support Travel Claim check-in.',
-            buttonPositive: 'Accept',
-            buttonNegative: 'Cancel'
-          }).then((bgResult) => {
-            const isGranted = bgResult === "granted";
-            this.setState({ locationPermission: true });
-            storeData(LocalDBItems.isEmployeeLocationTrack, isGranted);
-            storeData(LocalDBItems.isLocationTrackingNeeded, isGranted);
-          }).catch((bgErr) => {
-            console.error("Android background location error:", bgErr);
-            this.setState({ locationPermission: true });
-            storeData(LocalDBItems.isEmployeeLocationTrack, false);
-            storeData(LocalDBItems.isLocationTrackingNeeded, false);
-          });
-        }
-      })
-      .catch((err) => {
-        console.error("Android fine location error:", err);
-      });
-  }
-};
-
-
-
-  /**
-   * To request bg location permission of the user
-   */
+    if (Platform.OS === "ios") {
+      request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE)
+        .then((result) => {
+          this.setState((prev) => ({
+            ...prev,
+            locationPermission: result === RESULTS.GRANTED,
+            showPermissionDeniedModal:
+              result === RESULTS.BLOCKED || result === RESULTS.DENIED,
+          }));
+        })
+        .catch((error) => {
+          console.error("iOS location permission error:", error);
+        });
+    } else {
+      request(PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION)
+        .then((fineResult) => {
+          if (fineResult === RESULTS.GRANTED) {
+            request(PERMISSIONS.ANDROID.ACCESS_BACKGROUND_LOCATION)
+              .then((bgResult) => {
+                const isGranted = bgResult === RESULTS.GRANTED;
+                this.setState((prev) => ({
+                  ...prev,
+                  locationPermission: true,
+                }));
+                storeData(LocalDBItems.isEmployeeLocationTrack, isGranted);
+                storeData(LocalDBItems.isLocationTrackingNeeded, isGranted);
+              });
+          }
+        });
+    }
+  };
 
   requestBgLocatinPermission = () => {
-    request(
-      PERMISSIONS.ANDROID.ACCESS_BACKGROUND_LOCATION,
-      {
-        'title': 'Allow Enforce to access this device location even when the app is closed and not in user',
-        'message': 'Enforce App collects location data to enable Travel Claim when selecting place checkin even when the app is closed or not in use',
-        'buttonPositive': 'Accept',
-        'buttonNegative': 'Cancel'
-      }
-    ).then((value) => {
-      console.log('value--->', value);
-      if (value == "granted") {
-        this.setState({ locationPermission: true });
-      }
+    request(PERMISSIONS.ANDROID.ACCESS_BACKGROUND_LOCATION)
+      .then((value) => {
+        if (value === RESULTS.GRANTED) {
+          this.setState((prev) => ({
+            ...prev,
+            locationPermission: true,
+          }));
+        }
+      })
+      .catch((error) => console.log("Background loc err:", error));
+  };
 
-
-    }).catch((error) => {
-      console.log("Super",error);
-    })
-  }
-
-
-
-
-  /**
-   * To request camera permission of the user
-   */
   requestCameraPermission = () => {
-    let cameraPermission = this.getCameraPermissions();
+    const cameraPermission = this.getCameraPermissions();
     request(cameraPermission).then((result) => {
-      if (result == RESULTS.GRANTED) {
-        this.setState({ cameraPermission: true });
+      if (result === RESULTS.GRANTED) {
+        this.setState((prev) => ({
+          ...prev,
+          cameraPermission: true,
+        }));
       }
     });
   };
-  /**
-   * To request camera permission of the user
-   */
+
   getCameraPermissions = () => {
-    if (Platform.OS == "ios") {
-      return PERMISSIONS.IOS.CAMERA;
-    } else {
-      return PERMISSIONS.ANDROID.CAMERA;
-    }
-  };
-  /**
-   * To request location permission of the user
-   */
-  getLocationPermissions = () => {
-    if (Platform.OS == "ios") {
-      return [
-        PERMISSIONS.IOS.LOCATION_ALWAYS,
-        PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
-      ];
-    } else {
-      return [
-        PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
-        PERMISSIONS.ANDROID.ACCESS_BACKGROUND_LOCATION,
-        PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
-      ];
-    }
-  };
-  /**
-   * To handle terms and condition flag set by user
-   */
-  onTermsAndConditionPressed = () => {
-    this.setState({ termsAndCondition: !this.state.termsAndCondition });
-  };
-  /**
-   * To handle terms and condition flag set by user
-   */
-  isDisabledTermsAndCondition = () => {
-    if (!this.state.locationPermission || !this.state.cameraPermission) {
-      return true;
-    } else {
-      return false;
-    }
+    return Platform.OS === "ios"
+      ? PERMISSIONS.IOS.CAMERA
+      : PERMISSIONS.ANDROID.CAMERA;
   };
 
-  /**
-   * To handle button status
-   */
-  isAllowButtonDisabled = () => {
-    if (
-      !this.state.locationPermission ||
-      !this.state.cameraPermission ||
-      !this.state.termsAndCondition
-    ) {
-      return true;
-    } else {
-      return false;
-    }
+  getLocationPermissions = () => {
+    return Platform.OS === "ios"
+      ? [PERMISSIONS.IOS.LOCATION_WHEN_IN_USE, PERMISSIONS.IOS.LOCATION_ALWAYS]
+      : [
+          PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
+          PERMISSIONS.ANDROID.ACCESS_BACKGROUND_LOCATION,
+        ];
   };
-  /**
-   * To handle close modal on the screen
-   */
+
+  onTermsAndConditionPressed = () => {
+    this.setState((prev) => ({
+      ...prev,
+      termsAndCondition: !prev.termsAndCondition,
+    }));
+  };
+
+  isDisabledTermsAndCondition = () => {
+    return !(this.state.locationPermission && this.state.cameraPermission);
+  };
+
+  isAllowButtonDisabled = () => {
+    const { locationPermission, cameraPermission, termsAndCondition } =
+      this.state;
+    return !(locationPermission && cameraPermission && termsAndCondition);
+  };
+
   modalCloseAction = () => {
     Linking.openSettings();
-    this.setState({ showPermissionDeniedModal: false });
+    this.setState((prev) => ({
+      ...prev,
+      showPermissionDeniedModal: false,
+    }));
   };
-  /**
-   * method loads the view
-   */
+
   render() {
     return (
       <View style={[Helpers.fillCol, styles.container]}>
@@ -289,7 +193,7 @@ export default class PermissionScreen extends React.Component {
             facial detection.
           </Text>
           <View style={styles.permissionContainer}>
-            <TouchableOpacity onPress={() => this.requestLocationPermission()}>
+            <TouchableOpacity onPress={this.requestLocationPermission}>
               <View style={styles.permisionView}>
                 <View style={styles.permissionCellContainer}>
                   <Icon name="th-large" size={20} color="#fa8576" />
@@ -306,13 +210,13 @@ export default class PermissionScreen extends React.Component {
                           ? Images.checkedIcon
                           : Images.uncheckedIcon
                       }
-                      resizeMode={"contain"}
+                      resizeMode="contain"
                     />
                   </View>
                 </View>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => this.requestCameraPermission()}>
+            <TouchableOpacity onPress={this.requestCameraPermission}>
               <View style={styles.permisionView}>
                 <View style={styles.permissionCellContainer}>
                   <Icon name="camera" size={20} color="#fa8576" />
@@ -329,7 +233,7 @@ export default class PermissionScreen extends React.Component {
                           ? Images.checkedIcon
                           : Images.uncheckedIcon
                       }
-                      resizeMode={"contain"}
+                      resizeMode="contain"
                     />
                   </View>
                 </View>
@@ -338,7 +242,7 @@ export default class PermissionScreen extends React.Component {
           </View>
         </View>
         <TouchableOpacity
-          onPress={() => this.onTermsAndConditionPressed()}
+          onPress={this.onTermsAndConditionPressed}
           disabled={this.isDisabledTermsAndCondition()}
         >
           <View style={styles.privacyContainer}>
@@ -349,16 +253,14 @@ export default class PermissionScreen extends React.Component {
                   ? Images.checkedIcon
                   : Images.uncheckedIcon
               }
-              resizeMode={"contain"}
+              resizeMode="contain"
             />
             <Text style={styles.privacyPolicyNormalText}>
               {" I read the"}
-              <Text style={styles.privacyPolicyText}>{" Privacy policy"}</Text>
+              <Text style={styles.privacyPolicyText}> Privacy policy</Text>
               <Text style={styles.privacyPolicyNormalText}>
-                {" and i accept the"}
-                <Text style={styles.privacyPolicyText}>
-                  {" Terms and conditions"}
-                </Text>
+                {" and I accept the"}
+                <Text style={styles.privacyPolicyText}> Terms and conditions</Text>
               </Text>
             </Text>
           </View>
@@ -371,7 +273,7 @@ export default class PermissionScreen extends React.Component {
             justifyContent: "center",
             alignSelf: "center",
           }}
-          onPress={() => this.navigateToFaceRegistrationScreen()}
+          onPress={this.navigateToFaceRegistrationScreen}
         >
           <LinearGradient
             start={{ x: 0.5, y: 1.0 }}

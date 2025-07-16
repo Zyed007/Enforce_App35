@@ -6,7 +6,7 @@ import {
   useCameraDevice,
   useCameraPermission,
 } from 'react-native-vision-camera';
-import { useFaceDetector } from 'react-native-vision-camera-face-detector';
+//import { useFaceDetector } from 'react-native-vision-camera-face-detector';
 import RNFS from 'react-native-fs';
 import Loader from "../../../Components/Loader";
 
@@ -27,7 +27,7 @@ const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss }) => {
     contourMode: 'none',
     minFaceSize: 0.1, // Lower threshold to detect partial faces
   };
-  const { faces, detectFaces } = useFaceDetector(faceDetectionOptions);
+  //const { faces, detectFaces } = useFaceDetector(faceDetectionOptions);
 
   // Request camera permissions
   useEffect(() => {

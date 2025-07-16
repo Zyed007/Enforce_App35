@@ -55,7 +55,6 @@
     "react-native-uuid-generator": "^6.1.1",
     "react-native-vector-icons": "^10.2.0",
     "react-native-vision-camera": "^4.7.0",
-    "react-native-vision-camera-face-detector": "^1.8.6",
     "react-native-worklets-core": "^1.6.0",
     "react-redux": "^9.2.0",
     "redux": "^5.0.1",
