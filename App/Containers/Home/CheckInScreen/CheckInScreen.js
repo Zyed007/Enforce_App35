@@ -37,8 +37,6 @@ import GeoCoder from "../../../Components/GeoCoder";
 import LocationFetcher from "../../LocationModule/index";
 import UtilityHelper from "../../../Components/UtilityHelper";
 import moment from "moment";
-//import { RNCamera } from "react-native-camera";
-import { useCamera } from "react-native-camera-hooks"
 import { searchFaceImages } from "../../../Services/AWSService";
 import CustomPopUpModal from "../../../Components/CustomPopup";
 
@@ -50,7 +48,6 @@ import Toast from "react-native-simple-toast";
 import SwitchViewNew from "./SwitchView";
 import * as Progress from 'react-native-progress';
 import LocationError from "../../../Components/LocationError"
-import ImagePicker from 'react-native-image-crop-picker'
 import { getUUID } from "../../../helper";
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import RNFS from 'react-native-fs';
@@ -81,6 +78,8 @@ export default class CheckInScreen extends React.Component {
   constructor(props) {
     super(props);
     this.dismissAndGoBack = this.dismissAndGoBack.bind(this);
+    
+
     const initialLocation = props.route.params?.locationDetails || {
       formatted_address: '',
       latitude: 0,
@@ -129,7 +128,8 @@ export default class CheckInScreen extends React.Component {
         latitudeDelta: 0,
         longitudeDelta: 0,
       }),
-      locationName: this.props.route.params.locationDetails,
+      locationName: initialLocation.formatted_address,
+      currentLocationObj: initialLocation,
       locationDataInfo: this.props.route.params.locationDetails,
       manulLocation: "",
       teamId: [],
@@ -182,18 +182,6 @@ export default class CheckInScreen extends React.Component {
         latitude: LATITUDE,
         longitude: LONGITUDE,
       });
-    this.currentLocationObj = {
-      formatted_address: "",
-      street_number: "",
-      country: "",
-      administrative_area_level_1: "",
-      administrative_area_level_2: "",
-      locality: "",
-      route: "",
-      postal_code: "",
-      latitude: 0.0,
-      longitude: 0.0,
-    };
     (this.isProject = false), this.controller;
     this.scrollView;
     (this.geoCoder = new GeoCoder()),
@@ -205,159 +193,153 @@ export default class CheckInScreen extends React.Component {
     this.isAllowtocheckin = false;
   }
   // Modify componentDidMount to properly handle iOS permissions
-  async componentDidMount() {
-    try {
-      counter_face_data = 0;
+async componentDidMount() {
+  try {
+    counter_face_data = 0;
 
-      // Initialize with default location values
-      this.currentLocationObj = {
-        formatted_address: 'Current Location',
-        latitude: 0,
-        longitude: 0,
-        street_number: '',
-        route: '',
-        locality: '',
-        administrative_area_level_2: '',
-        administrative_area_level_1: '',
-        postal_code: '',
-        country: ''
+    // Initialize with default location values
+    this.currentLocationObj = {
+      formatted_address: '',
+      latitude: 0,
+      longitude: 0,
+      street_number: '',
+      route: '',
+      locality: '',
+      administrative_area_level_2: '',
+      administrative_area_level_1: '',
+      postal_code: '',
+      country: ''
+    };
+
+    // 1. First try to use passed location data if available
+    const { cordinateObj, locationDetails } = this.props.route.params || {};
+    if (cordinateObj && locationDetails) {
+      console.log('[Location] Using passed location:', {
+        lat: cordinateObj.latitude,
+        lng: cordinateObj.longitude,
+        address: locationDetails.formatted_address
+      });
+
+      this.cordinateObj = {
+        latitude: cordinateObj.latitude,
+        longitude: cordinateObj.longitude
       };
 
-      // 1. Initialize with passed location data if available
-      const { cordinateObj, locationDetails } = this.props.route.params || {};
-      if (cordinateObj && locationDetails) {
-        console.log('[Location] Initializing with passed location:', {
-          lat: cordinateObj.latitude,
-          lng: cordinateObj.longitude,
-          address: locationDetails.formatted_address
-        });
+      this.currentLocationObj = {
+        ...locationDetails, // Use all passed location details
+        latitude: cordinateObj.latitude,
+        longitude: cordinateObj.longitude
+      };
 
-        this.cordinateObj = {
-          latitude: cordinateObj.latitude,
-          longitude: cordinateObj.longitude
-        };
-
-        this.currentLocationObj = {
-          ...this.currentLocationObj,
-          formatted_address: locationDetails.formatted_address || 'Current Location',
-          latitude: cordinateObj.latitude,
-          longitude: cordinateObj.longitude
-        };
-
-        this.setState({
-          locationName: locationDetails.formatted_address || 'Current Location',
-          isInitialLoad: false
-        });
-      }
-
-      // 2. iOS-specific location handling
-      if (Platform.OS === 'ios') {
-        try {
-          console.log('[iOS] Checking location permissions...');
-          const status = await check(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-
-          if (status !== RESULTS.GRANTED) {
-            console.log('[iOS] Requesting location permissions...');
-            const newStatus = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-
-            if (newStatus !== RESULTS.GRANTED) {
-              console.warn('[iOS] Location permission denied');
-              Alert.alert(
-                'Permission Required',
-                'Location access is needed for check-in functionality'
-              );
-
-              // Even without permission, use passed location if available
-              if (cordinateObj) {
-                console.log('[iOS] Falling back to passed location due to permission denial');
-                this.currentLocationObj = {
-                  ...this.currentLocationObj,
-                  latitude: cordinateObj.latitude,
-                  longitude: cordinateObj.longitude
-                };
-              }
-            }
-          }
-
-          // Set timeout for iOS location validation
-          this.locationTimeout = setTimeout(() => {
-            console.log('[iOS] Location validation timeout reached');
-            if (!this.hasValidLocation()) {
-              console.warn('[iOS] Location validation failed after timeout');
-              if (cordinateObj) {
-                console.log('[iOS] Using fallback location coordinates');
-                this.currentLocationObj = {
-                  ...this.currentLocationObj,
-                  latitude: cordinateObj.latitude,
-                  longitude: cordinateObj.longitude
-                };
-              } else {
-                Alert.alert(
-                  'Location Error',
-                  'Could not determine your current location'
-                );
-              }
-            }
-          }, 3000); // 3 second timeout
-        } catch (error) {
-          console.error('[iOS] Location permission error:', error);
-          // Fallback to passed location if available
-          if (cordinateObj) {
-            this.currentLocationObj = {
-              ...this.currentLocationObj,
-              latitude: cordinateObj.latitude,
-              longitude: cordinateObj.longitude
-            };
-          }
-        }
-      }
-
-      // 3. Load essential data with validation
-      console.log('[Init] Loading employee details...');
-      const empDetails = await this.getEmployeeDetails();
-      if (!empDetails) {
-        throw new Error('Failed to load employee details');
-      }
-      console.log('[Init] Employee details loaded successfully');
-
-      console.log('[Init] Fetching project data...');
-      await this.fetchAllProjectByOrgID();
-
-      console.log('[Init] Initializing geocoder...');
-      this.geoCoder.initiaLizeGeoCoder();
-
-      console.log('[Init] Getting UUID...');
-      this.UUID = await getUUID();
-
-      console.log('[Init] Starting error timer...');
-      this.errortimer();
-      // 4. Set up navigation listener
-      this._unsubscribe = this.props.navigation.addListener("blur", () => {
-        console.log('[Cleanup] Removing location listeners...');
-        if (this.locationFetcher) {
-          this.locationFetcher.removeListners();
-        }
-        if (this.locationTimeout) {
-          clearTimeout(this.locationTimeout);
-        }
+      this.setState({
+        locationName: locationDetails.formatted_address || 'Current Location',
+        isInitialLoad: false
       });
-
-      console.log('[Init] CheckInScreen mounted successfully');
-      console.log('[Init] Current location state:', {
-        coords: this.cordinateObj,
-        address: this.currentLocationObj.formatted_address,
-        isInitialLoad: this.state.isInitialLoad
-      });
-
-    } catch (error) {
-      console.error('[Init] Initialization failed:', error);
-      Alert.alert(
-        'Initialization Error',
-        'Failed to initialize check-in. Please try again.'
-      );
-      this.props.navigation.goBack();
     }
+
+    // 2. Initialize geocoder early
+    console.log('[Init] Initializing geocoder...');
+    await this.geoCoder.initiaLizeGeoCoder();
+
+    // 3. If no passed location or on iOS, get fresh location
+    if (!cordinateObj || Platform.OS === 'ios') {
+      try {
+        console.log('[Location] Requesting fresh location...');
+        const status = await check(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
+        
+        if (status !== RESULTS.GRANTED) {
+          const newStatus = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
+          if (newStatus !== RESULTS.GRANTED) {
+            throw new Error('Location permission denied');
+          }
+        }
+
+        const position = await new Promise((resolve, reject) => {
+          Geolocation.getCurrentPosition(
+            resolve,
+            reject,
+            { 
+              enableHighAccuracy: true, 
+              timeout: 10000,
+              maximumAge: 0 
+            }
+          );
+        });
+
+        console.log('[Location] Got fresh coordinates:', position.coords);
+        this.cordinateObj = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        };
+
+        // Get full address details
+        const freshLocation = await this.geoCoder.getPlaceFromCordinate(
+          position.coords.latitude,
+          position.coords.longitude
+        );
+
+        if (freshLocation) {
+          console.log('[Location] Fresh location details:', freshLocation);
+          this.currentLocationObj = freshLocation;
+          this.setState({
+            locationName: freshLocation.formatted_address,
+            isInitialLoad: false
+          });
+        }
+      } catch (error) {
+        console.warn('[Location] Error getting fresh location:', error);
+        if (!cordinateObj) {
+          Alert.alert(
+            'Location Error', 
+            'Could not determine your current location'
+          );
+        }
+      }
+    }
+
+    // 4. Load other essential data
+    console.log('[Init] Loading employee details...');
+    const empDetails = await this.getEmployeeDetails();
+    if (!empDetails) {
+      throw new Error('Failed to load employee details');
+    }
+
+    console.log('[Init] Fetching project data...');
+    await this.fetchAllProjectByOrgID();
+
+    console.log('[Init] Getting UUID...');
+    this.UUID = await getUUID();
+
+    console.log('[Init] Starting error timer...');
+    this.errortimer();
+
+    // 5. Set up navigation listener
+    this._unsubscribe = this.props.navigation.addListener("blur", () => {
+      console.log('[Cleanup] Removing location listeners...');
+      if (this.locationFetcher) {
+        this.locationFetcher.removeListners();
+      }
+      if (this.locationTimeout) {
+        clearTimeout(this.locationTimeout);
+      }
+    });
+
+    console.log('[Init] CheckInScreen mounted successfully');
+    console.log('[Init] Final location state:', {
+      coords: this.cordinateObj,
+      address: this.currentLocationObj.formatted_address
+    });
+
+  } catch (error) {
+    console.error('[Init] Initialization failed:', error);
+    this.setState({ isLoading: false });
+    Alert.alert(
+      'Error',
+      'Failed to initialize check-in. Please try again.'
+    );
+    this.props.navigation.goBack();
   }
+}
 
   // Helper method to validate location
   hasValidLocation = () => {
@@ -2675,6 +2657,7 @@ addTimesheetCheckIn = async () => {
         onCameraError={(error) => {
           addLog(`Camera error: ${error}`);
         }}
+        navigation={this.props.navigation}
       />
     );
   }
@@ -2696,128 +2679,12 @@ addTimesheetCheckIn = async () => {
 
 
   // Face detection
-  facesDetected = ({ faces }) => {
-    if (faces.length > 0) {
-      // If team is selected
-      if (this.state.isTeamClicked) {
-        // check if face is detected to false and group checkin verify button
-        if (!this.faceDetectedOrNot && this.isGroupVerifyClicked) {
-          this.faceDetectedOrNot = true;
-          if (!this.ModalOpen) {
-            this.showTimerWhenFaceDetected();
-          }
-        } else {
-          // First we need to verify the admin user when group checkin
-          if (!this.faceDetectedOrNot) {
-            this.faceDetectedOrNot = true;
-            if (!this.stopTimer) {
-              this.showTimerWhenFaceDetected();
-            }
-          }
-        }
-        this.setState({
-          faces,
-          faceDetectedOrNot: true,
-          showAlertIdNoFace: false,
-        });
-      } else {
-        if (!this.faceDetectedOrNot) {
-          this.faceDetectedOrNot = true;
-          this.showTimerWhenFaceDetected();
-        }
-        this.setState({
-          faces,
-          faceDetectedOrNot: true,
-          showAlertIdNoFace: false,
-        });
-      }
-    } else {
-      if (this.state.isTeamClicked) {
-        if (this.isGroupVerifyClicked) {
-          this.faceDetectedOrNot = false;
-          if (this.timer != null) {
-            clearInterval(this.timer);
-          }
-          this.timerCamera = 2;
-          this.setState({ faces, showAlertIdNoFace: true });
-        }
-      } else {
-        this.faceDetectedOrNot = false;
-        if (this.timer != null) {
-          clearInterval(this.timer);
-        }
-        this.timerCamera = 2;
-        this.setState({ faces, showAlertIdNoFace: true });
-      }
-    }
-  };
-
-
-  renderFace = ({ bounds, faceID, rollAngle, yawAngle }) => (
-    <View
-      key={faceID}
-      transform={[
-        { perspective: 600 },
-        { rotateZ: `${rollAngle.toFixed(0)}deg` },
-        { rotateY: `${yawAngle.toFixed(0)}deg` },
-      ]}
-      style={[
-        styles.face,
-        {
-          ...bounds.size,
-          left: bounds.origin.x,
-          top: bounds.origin.y,
-        },
-      ]}
-    >
-      <Text style={styles.faceText}>ID: {faceID}</Text>
-      <Text style={styles.faceText}>rollAngle: {rollAngle.toFixed(0)}</Text>
-      <Text style={styles.faceText}>yawAngle: {yawAngle.toFixed(0)}</Text>
-    </View>
-  );
-
-  renderLandmarksOfFace(face) {
-    const renderLandmark = (position) =>
-      position && (
-        <View
-          style={[
-            styles.landmark,
-            {
-              left: position.x - landmarkSize / 2,
-              top: position.y - landmarkSize / 2,
-            },
-          ]}
-        />
-      );
-    return (
-      <View key={`landmarks-${face}`}>
-        {renderLandmark(face.leftEyePosition)}
-        {renderLandmark(face.rightEyePosition)}
-        {renderLandmark(face.leftEarPosition)}
-        {renderLandmark(face.rightEarPosition)}
-        {renderLandmark(face.leftCheekPosition)}
-        {renderLandmark(face.rightCheekPosition)}
-        {renderLandmark(face.leftMouthPosition)}
-        {renderLandmark(face.mouthPosition)}
-        {renderLandmark(face.rightMouthPosition)}
-        {renderLandmark(face.noseBasePosition)}
-        {renderLandmark(face.bottomMouthPosition)}
-      </View>
-    );
-  }
-
-  renderLandmarks = () => (
-    <View style={styles.facesContainer} pointerEvents="none">
-      {this.state.faces.map(this.renderLandmarksOfFace)}
-    </View>
-  );
-
-
-
+ 
 
   onViewDescription = () => {
     this.setState({ isViewDecription: true });
   };
+
   renderChipSelectedTeam() {
     return (
       <View
@@ -3013,16 +2880,21 @@ addTimesheetCheckIn = async () => {
       this.setState({ manulLocation: value, manualAddress: value });
     }
   };
-  getLocationName = () => {
-    if (this.state.isManual) {
-      return this.state.manulLocation;
-    } else {
-      return this.currentLocationObj.formatted_address;
-    }
-  };
-  getLocationAddressForPlace = () => {
+  // getLocationName = () => {
+  //   if (this.state.isManual) {
+  //     return this.state.manulLocation;
+  //   } else {
+  //     return this.currentLocationObj.formatted_address;
+  //   }
+  // };
+  
+ getLocationAddressForPlace = () => {
+  // Check if currentLocationObj exists and has formatted_address
+  if (this.currentLocationObj && this.currentLocationObj.formatted_address) {
     return this.currentLocationObj.formatted_address;
-  };
+  }
+  return "Loading location..."; // Fallback text
+};
 
   renderCaseTabView() {
     return (
@@ -3091,7 +2963,8 @@ addTimesheetCheckIn = async () => {
 
         ) : (
           <LocationText
-            locationName={this.getLocationName()}
+            //locationName={"this.getLocationName()"}
+            locationName={ this.getLocationAddressForPlace()}
             isEditabe={this.state.isManual}
             setLocationName={(text) => this.setLocationName(text)}
           />
@@ -3137,43 +3010,43 @@ addTimesheetCheckIn = async () => {
     longitudeDelta: LONGITUDE_DELTA,
   });
 
-  getLoctionObj = async (locationObj) => {
-    let locationName = this.currentLocationObj;
+getLoctionObj = async (locationObj) => {
+  try {
+    // Update coordinates immediately
+    this.cordinateObj = {
+      latitude: locationObj.latitude,
+      longitude: locationObj.longitude
+    };
 
-    if (this.state.isLocationFetcherRequired) {
-      try {
-        if (this.currentLocationObj.formatted_address === "" || Platform.OS === 'ios') {
-          locationName = await this.geoCoder.getPlaceFromCordinate(
-            locationObj.latitude,
-            locationObj.longitude
-          );
-        }
-        this.currentLocationObj = locationName;
-        console.log('locationName--->', locationName);
-        const newCordObj = {
-          longitude: locationObj.longitude,
-          latitude: locationObj.latitude,
-        };
-        this.cordinateObj = newCordObj;
-        if (!this.state.isManual) {
-          this.setState({
-            locationName: this.currentLocationObj.formatted_address || 'Current Location',
-            isInitialLoad: false,
-            isLoading: false,
-          });
-        }
-      } catch (error) {
-        console.error('Error getting location:', error);
-        if (Platform.OS === 'ios') {
-          this.setState({
-            locationName: 'Current Location',
-            isInitialLoad: false,
-            isLoading: false,
-          });
-        }
+    // Only fetch geocode details if we don't already have them
+    if (!this.currentLocationObj.formatted_address || Platform.OS === 'ios') {
+      const locationDetails = await this.geoCoder.getPlaceFromCordinate(
+        locationObj.latitude, 
+        locationObj.longitude
+      );
+      
+      if (locationDetails) {
+        this.currentLocationObj = locationDetails;
+        console.log('Fetched location details:', locationDetails);
+        
+        this.setState({
+          locationName: locationDetails.formatted_address,
+          currentLocationObj: locationDetails,
+          isInitialLoad: false,
+          isLoading: false
+        });
       }
     }
-  };
+  } catch (error) {
+    console.error('Error getting location details:', error);
+    this.setState({
+      isLoading: false,
+      isInitialLoad: false
+    });
+  }
+};
+
+
   isInRadius = (isInRadius) => { };
   renderTeamsView() {
     const { getAllTeamData, teamMultipleSelect } = this.state;

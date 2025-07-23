@@ -29,7 +29,6 @@ import {
   wipeData,
 } from "../../Services/LocalStorage";
 import Loader from "../../Components/Loader";
-import textDis from "../../Components/ErrorAlertPopup"
 import moment from "moment";
 import GeoCoder from "../../Components/GeoCoder";
 import LocationFetcher from "../LocationModule/index";
@@ -118,7 +117,7 @@ export default class HomeScreen extends React.Component {
         latitude: 25.2048,
         longitude: 55.2708,
       }),
-      (this.geoCoder = new GeoCoder());
+    (this.geoCoder = new GeoCoder());
     this.currentLocationObj = {
       formatted_address: "",
       street_number: "",
@@ -437,26 +436,47 @@ export default class HomeScreen extends React.Component {
   /**
    * Navigate to check in screen
    */
- navigateToCheckInScreen = async () => {
+navigateToCheckInScreen = async () => {
   try {
-    // Get current location first
-    const location = await this.getCurrentLocation();
+    console.log('Attempting to fetch current location...');
     
-    if (location) {
-      console.log("Navigating to CheckInScreen with:", location);
-      NavigationService.navigate("CheckInScreen", {
-  locationDetails: location.formatted_address || "Current Location",
-  cordinateObj: {
-    latitude: location.latitude,
-    longitude: location.longitude
-  },
-});
-    } else {
-      Alert.alert("Error", "Could not get current location");
-    }
+    // Get current location coordinates
+    const position = await new Promise((resolve, reject) => {
+      Geolocation.getCurrentPosition(
+        resolve,
+        reject,
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+      );
+    });
+
+    console.log('Raw coordinates:', {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude
+    });
+
+    // Get full address details
+    const locationDetails = await this.geoCoder.getPlaceFromCordinate(
+      position.coords.latitude,
+      position.coords.longitude
+    );
+
+    // Navigate with complete location data
+    NavigationService.navigate("CheckInScreen", {
+      locationDetails: locationDetails, // Pass entire location object
+      cordinateObj: {
+        latitude: locationDetails.latitude,
+        longitude: locationDetails.longitude
+      },
+      fullLocationDetails: locationDetails // Pass entire object
+    });
+
   } catch (error) {
-    console.error("Navigation error:", error);
-    Alert.alert("Error", "Failed to navigate to check-in screen");
+    console.error('Location fetch error:', error);
+    Alert.alert(
+      "Location Error",
+      "Could not get current location. Please ensure location services are enabled.",
+      [{ text: "OK" }]
+    );
   }
 };
 
@@ -549,7 +569,7 @@ getCurrentLocation = () => {
         country: this.currentLocationObj.country,
       },
     };
-    console.log(" AM here bitvhb in UUID", params)
+    console.log("I AM here bitch in UUID", params)
     await storeData(LocalDBItems.checkOutLocationInfo, this.currentLocationObj);
 
     const requestObj = {
@@ -603,126 +623,228 @@ getCurrentLocation = () => {
   /**
    * show popup and checkout modal
    */
-  showPopupAndCheckOut = async () => {
-    this.setState({ showAlertPopup: true, isCheckOutPopup: true });
-  };
+showPopupAndCheckOut = async () => {
+  if (this.state.showAlertPopup || this.state.isCheckOutPopup) return;
+  this.setState({ showAlertPopup: true, isCheckOutPopup: true });
+};
   /**
    * This method is to post the checkout
    * @param {bool} isEndOfWork
    */
-  postCheckout = async (isEndOfWork = false) => {
-    console.log('post checkout', this.currentLocationObj)
-    this.setState({ loading: true });
+postCheckout = async (isEndOfWork = false) => {
+  try {
+    console.log('Starting checkout process...');
+    this.setState({ 
+      loading: true,
+      loadingMessage: 'Preparing checkout...' 
+    });
+
+    // 1. Get required data
     const userId = await getData(LocalDBItems.employeeDetails);
-    const checkInDetails = await getData(LocalDBItems.CHECK_IN_OUT_DETAILS)
-    const date = await AsyncStorage.getItem("forcetime")
-    let formattedTime = moment().format("MM/DD/YYYY") + ' ' + date;
-    let forceCheckoutTime = moment(formattedTime, "YYYY-MM-DD HH:mm").format("YYYY-MM-DD HH:mm:ss.SSS");
-    console.log(forceCheckoutTime, "forceCheckoutTime");
-    let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
-    console.log('-----205', checkIsInRadius)
-    let isFetchedGeoCorderObj = await this.fetchGeocoderObject();
-    console.log("Data", isFetchedGeoCorderObj)
-    if (!isFetchedGeoCorderObj) {
-      console.log("Over")
-      if (checkout_counter < 2) {
-        Toast.show("Unable to fetch geo location info", Toast.LONG);
-        this.setState({ loading: false, isCheckOutPopup: false, showAlertPopup: false });
-        checkout_counter++;
-        console.log("CheckoutCounter", checkout_counter)
-      }
-      else {
-        this.location_feching();
-        this.setState({ loading: false, isCheckOutPopup: false, showAlertPopup: false });
-        Toast.show("We have sucessfully registered your Technical Error", Toast.LONG);
-      }
-    }
-    else {
-      console.log("straight forward")
-      let params = {
-        team_member_empid: this.checkInDataValue.empid,
-        groupid: this.checkInDataValue.groupid,
-        check_out: formattedTime,
-        checkout_tag_id: this.UUID,
-        is_inrange: checkIsInRadius ? checkIsInRadius : false,
-        modifiedby: userId.full_name,
-        check_out_method: isEndOfWork,
-        TimesheetCurrentLocationViewModel: {
-          formatted_address: this.currentLocationObj.formatted_address,
-          lat: this.cordinateObj.latitude,
-          lang: this.cordinateObj.longitude,
-          street_number: this.currentLocationObj.street_number,
-          route: this.currentLocationObj.route,
-          locality: this.currentLocationObj.locality,
-          administrative_area_level_2: this.currentLocationObj
-            .administrative_area_level_2,
-          administrative_area_level_1: this.currentLocationObj
-            .administrative_area_level_1,
-          postal_code: this.currentLocationObj.postal_code,
-          country: this.currentLocationObj.country,
-        },
-      };
-      await storeData(LocalDBItems.checkOutLocationInfo, this.currentLocationObj);
-      console.log("doubt in UUID", params);
-      const requestObj = {
-        endpoint: BaseUrl.API_BASE_URL + Endpoint.TIMESHEET_CHECKOUT,
-        type: "post",
-        params: params,
-      };
-      const apiResponseData = await apiService(requestObj);
-      setTimeout(() => {
-        this.setState({
-          loading: false,
+    const checkInDetails = await getData(LocalDBItems.CHECK_IN_OUT_DETAILS);
+    const checkInLocation = await getData(LocalDBItems.checkInLocationInfo);
+    
+    // 2. Get current location with retries
+    let locationAttempts = 0;
+    let locationSuccess = false;
+    let checkIsInRadius = false;
+    let forceCheckoutRequired = false;
+    
+    while (locationAttempts < 3 && !locationSuccess) {
+      locationAttempts++;
+      try {
+        console.log(`Location attempt ${locationAttempts}/3`);
+        this.setState({ loadingMessage: `Getting location (${locationAttempts}/3)...` });
+        
+        const position = await new Promise((resolve, reject) => {
+          Geolocation.getCurrentPosition(
+            resolve,
+            reject,
+            { 
+              enableHighAccuracy: true, 
+              timeout: 10000, 
+              maximumAge: 0 
+            }
+          );
         });
-        console.log("Apireasponse Location", apiResponseData);
-        /*-- Changing for the stimulation of the error  */
-        if (apiResponseData.status === "200") {
-          if (isEndOfWork) {
-            this.timer_error = false;
-            this.isWorkEnded = true;
-            this.isCheckinForLocation = false;
-            storeData(LocalDBItems.isEmployeeLocationTrack, false);
-            storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInDetails)
-            this.locationFetcher.removeLocationUpdate();
-          } else {
-            this.startTracking(); //for check out
+
+        if (position?.coords) {
+          // Store current location
+          this.cordinateObj = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+          
+          // Verify location against check-in location
+          if (checkInLocation?.latitude && checkInLocation?.longitude) {
+            const distance = haversine(
+              {
+                latitude: checkInLocation.latitude,
+                longitude: checkInLocation.longitude
+              },
+              this.cordinateObj,
+              { unit: 'meter' }
+            );
+            
+            console.log(`Distance from check-in: ${distance}m`);
+            
+            // Show force checkout popup if distance > 100m
+            if (distance > 100) {
+              forceCheckoutRequired = true;
+              break;
+            }
           }
-          clearInterval(this.timerCheckIn);
-          clearInterval(this.timerBreakIn);
-          clearInterval(this.showTimerForAutoCheckOut);
-          this.timerStopCounter = 0;
-          this.timerStopForBreakCounter = 0;
-          this.setState({
-            breakInData: null,
-            checkInData: null,
-            isStarted: false,
-            isBreak: false,
-            stopWatchCounter: "00:00",
-            stopWatchCounterBreakIn: "00:00",
-            loading: false,
-            progressBarPercentage: 0,
-            showAlertPopup: false,
-            isCheckOutPopup: false,
-          });
-          const full_name = `${userId.full_name}'s Checked Out sucessfully`;
-          Toast.show(full_name, Toast.LONG);
-          const checkinInfo = { isOfficeChecin: false, isProjectCheckin: false };
-          storeData(LocalDBItems.checkInInfo, checkinInfo);
-        }
-        else {
-          if (checkout_counter < 2) {
-            Toast.show("Your Checkin Location And CheckOut Location Doesnt Match.Please Retry ", Toast.LONG);
-            this.setState({ loading: false, isCheckOutPopup: false, showAlertPopup: false });
-            checkout_counter++;
-            console.log("CheckoutCounter", checkout_counter)
-          }
-          else {
-            this.setState({ loading: false, isCheckOutPopup: false, showAlertPopup: false, isForceCheckoutPopUp: true });
+          
+          // Get address details
+          const locationDetails = await this.geoCoder.getPlaceFromCordinate(
+            this.cordinateObj.latitude,
+            this.cordinateObj.longitude
+          );
+          
+          if (locationDetails) {
+            this.currentLocationObj = locationDetails;
+            locationSuccess = true;
+            checkIsInRadius = await this.locationFetcher.isLocationInRadius();
           }
         }
-      }, 1000);
+      } catch (error) {
+        console.warn(`Location attempt ${locationAttempts} failed:`, error);
+        if (locationAttempts === 3) {
+          // Use last known location as fallback
+          const lastLocation = await getData(LocalDBItems.location);
+          if (lastLocation) {
+            console.log('Using last known location as fallback');
+            this.cordinateObj = lastLocation;
+            locationSuccess = true;
+            forceCheckoutRequired = true;
+          }
+        }
+      }
     }
-  };
+
+    // 3. Handle force checkout cases
+    if (forceCheckoutRequired || !locationSuccess) {
+      console.log('Force checkout required');
+      this.setState({ 
+        isForceCheckoutPopUp: true,
+        loading: false 
+      });
+      return;
+    }
+
+    // 4. Prepare checkout data
+    const checkoutTime = moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A");
+    console.log('Checkout time:', checkoutTime);
+    
+    const locationData = {
+      formatted_address: this.currentLocationObj.formatted_address || "Location not available",
+      lat: this.cordinateObj.latitude,
+      lang: this.cordinateObj.longitude,
+      street_number: this.currentLocationObj.street_number || "",
+      route: this.currentLocationObj.route || "",
+      locality: this.currentLocationObj.locality || "",
+      administrative_area_level_2: this.currentLocationObj.administrative_area_level_2 || "",
+      administrative_area_level_1: this.currentLocationObj.administrative_area_level_1 || "",
+      postal_code: this.currentLocationObj.postal_code || "",
+      country: this.currentLocationObj.country || ""
+    };
+
+    // 5. Prepare API request
+    const params = {
+      team_member_empid: this.checkInDataValue.empid,
+      groupid: this.checkInDataValue.groupid,
+      check_out: checkoutTime,
+      checkout_tag_id: this.UUID,
+      is_inrange: checkIsInRadius,
+      modifiedby: userId.full_name,
+      check_out_method: isEndOfWork,
+      TimesheetCurrentLocationViewModel: locationData
+    };
+
+    await storeData(LocalDBItems.checkOutLocationInfo, locationData);
+    
+    const requestObj = {
+      endpoint: BaseUrl.API_BASE_URL + Endpoint.TIMESHEET_CHECKOUT,
+      type: "post",
+      params: params,
+    };
+
+    // 6. Execute checkout API call
+    this.setState({ loadingMessage: 'Processing checkout...' });
+    const apiResponseData = await apiService(requestObj);
+    
+    if (apiResponseData.status === "200") {
+      // 7. Handle successful checkout
+      console.log('Checkout successful:', apiResponseData);
+      
+      // Clear timers and tracking
+      clearInterval(this.timerCheckIn);
+      clearInterval(this.timerBreakIn);
+      clearInterval(this.showTimerForAutoCheckOut);
+      
+      // Reset state
+      this.timerStopCounter = 0;
+      this.timerStopForBreakCounter = 0;
+      
+      // Update storage
+      if (isEndOfWork) {
+        storeData(LocalDBItems.isEmployeeLocationTrack, false);
+        this.locationFetcher.removeLocationUpdate();
+      } else {
+        this.startTracking();
+      }
+      
+      // Update UI state
+      this.setState({
+        breakInData: null,
+        checkInData: null,
+        isStarted: false,
+        isBreak: false,
+        stopWatchCounter: "00:00",
+        stopWatchCounterBreakIn: "00:00",
+        progressBarPercentage: 0,
+        loading: false,
+        showAlertPopup: false,
+        isCheckOutPopup: false,
+      });
+
+      // Show success message
+      Toast.show(`${userId.full_name} checked out successfully`, Toast.LONG);
+      
+      // Reset checkin info
+      storeData(LocalDBItems.checkInInfo, { 
+        isOfficeChecin: false, 
+        isProjectCheckin: false 
+      });
+      
+    } else {
+      // Handle API error
+      console.error('Checkout API error:', apiResponseData);
+      throw new Error(apiResponseData.message || "Checkout failed");
+    }
+
+  } catch (error) {
+    console.error('Checkout process failed:', error);
+    
+    // Show appropriate error message
+    const errorMessage = error.message.includes('network') 
+      ? 'Network error during checkout' 
+      : error.message || 'Checkout failed';
+    
+    Toast.show(errorMessage, Toast.LONG);
+    
+    // Reset state
+    this.setState({ 
+      loading: false,
+      showAlertPopup: false,
+      isCheckOutPopup: false,
+      isForceCheckoutPopUp: true // Show force checkout popup on error
+    });
+  } finally {
+    // Reset loading message
+    this.setState({ loadingMessage: null });
+  }
+};
 
 
   //   errortimer = async () => {
@@ -918,7 +1040,7 @@ getCurrentLocation = () => {
         country: this.currentLocationObj.country,
       },
     };
-    console.log(params), "UUID Errroe";
+    console.log(params), "UUID Error";
     await storeData(LocalDBItems.checkOutLocationInfo, this.currentLocationObj);
     const requestObj = {
       endpoint: BaseUrl.API_BASE_URL + Endpoint.TIMESHEET_CHECKOUT,
@@ -1077,24 +1199,34 @@ getCurrentLocation = () => {
       }
     }, 800);
   };
-  fetchGeocoderObject = async () => {
-    let locationObj = await getData(LocalDBItems.location);
-    if (locationObj) {
-      console.log("locationObj.latitude", locationObj.latitude);
-      console.log("locationObj.latitude", locationObj.longitude);
-      let locationName = await this.geoCoder.getPlaceFromCordinate(
-        locationObj.latitude,
-        locationObj.longitude
-      );
 
-      this.currentLocationObj = locationName;
-      if (this.currentLocationObj) {
-        return true;
-      }
+fetchGeocoderObject = async () => {
+  try {
+    let locationObj = await getData(LocalDBItems.location);
+    if (!locationObj) {
+      console.warn("No location data available");
       return false;
     }
+
+    console.log("Fetching geocode for:", locationObj.latitude, locationObj.longitude);
+    
+    let locationName = await this.geoCoder.getPlaceFromCordinate(
+      locationObj.latitude,
+      locationObj.longitude
+    );
+
+    if (!locationName) {
+      console.warn("Geocoder returned empty response");
+      return false;
+    }
+
+    this.currentLocationObj = locationName;
+    return true;
+  } catch (error) {
+    console.error("Geocoding failed:", error);
     return false;
-  };
+  }
+};
   /**
    * This method is to post break in
    */
@@ -1390,17 +1522,25 @@ getCurrentLocation = () => {
     let currentDate = new Date();
   };
 
-  navigateToAuthScreen = async () => {
-    // Toast.showWithGravity('apiResponseData.desc', Toast.LONG, Toast.BOTTOM)
-    await wipeData();
-    if (this.locationFetcher != null) {
-      this.locationFetcher.removeListners();
-      this.locationFetcher.removeLocationUpdate();
-      this.locationFetcher = null;
-    }
-    storeData(LocalDBItems.isUserAuthenticated, false);
-    NavigationService.navigateAndReset("Auth", {});
-  };
+navigateToAuthScreen = async () => {
+  console.log("Wiping data..."); // Debug
+  await wipeData();
+  console.log("Data wiped"); // Debug
+  
+  if (this.locationFetcher != null) {
+    console.log("Cleaning up location fetcher..."); // Debug
+    this.locationFetcher.removeListners();
+    this.locationFetcher.removeLocationUpdate();
+    this.locationFetcher = null;
+  }
+
+  console.log("Setting auth flag..."); // Debug
+  await storeData(LocalDBItems.isUserAuthenticated, false);
+  
+  console.log("Navigating to Auth..."); // Debug
+  NavigationService.navigateAndReset("Auth", {});
+};
+
   renderCheckBreakButton() {
     const {
       loading,
@@ -1535,11 +1675,13 @@ getCurrentLocation = () => {
   };
 
   modalLogout = () => {
-    Geolocation.stopObserving();
-    this.setState({ showAlertPopup: false, isCheckOutPopup: false }, () => {
-      this.navigateToAuthScreen();
-    });
-  };
+  console.log("Starting logout process..."); // Debug
+  Geolocation.stopObserving();
+  this.setState({ showAlertPopup: false, isCheckOutPopup: false }, () => {
+    console.log("State updated, navigating to Auth..."); // Debug
+    this.navigateToAuthScreen();
+  });
+};
   resetTracking = async () => {
     await storeData(LocalDBItems.isLocationTrackingNeeded, false);
     await storeData(LocalDBItems.locationArray, []);
@@ -1590,10 +1732,11 @@ getCurrentLocation = () => {
       return false;
     }
   };
+
   renderAdminPrivilage() {
     if (this.employeeDetails.is_superadmin || this.employeeDetails.is_admin) {
       return (
-        <>
+        
           <TouchableOpacity
             style={{
               position: "absolute",
@@ -1604,12 +1747,13 @@ getCurrentLocation = () => {
             }}
             onPress={() => this.navigateToViewRoleScreen()}
           >
-            <Icon name="home" size={25} color="white" />
+            <Icon name="home" size={35} color="white" />
           </TouchableOpacity>
-        </>
+
       );
     }
   }
+
   navigateToLiveTracking = () => {
     this.setState({ showTrackingModal: true });
   };
@@ -1725,21 +1869,21 @@ getCurrentLocation = () => {
               justifyContent: "flex-end",
               alignItems: "flex-end",
               right: 20,
-              bottom: 20,
+              bottom: 25,
             }}
             onPress={() => this.showLogoutPopup()}
           >
             <Icon name="logout" size={30} color="white" />
           </TouchableOpacity>
-        </LinearGradient>
+        </LinearGradient> 
         <View
           style={{
             padding: 10,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
-          }}
-        >
+          }}>
+          
           <Text
             style={{
               paddingLeft: 10,

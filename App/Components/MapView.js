@@ -1,151 +1,174 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Text, View, Alert } from "react-native";
+import { Text, View, Alert, Platform, StyleSheet } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE, Circle } from "react-native-maps";
 import UtilityHelper from "../Components/UtilityHelper";
 import GeoCoder from "../Components/GeoCoder";
-import Icons from "react-native-vector-icons/MaterialIcons";
+import Icons from "react-native-vector-icons/MaterialCommunityIcons";
 
 const LATITUDE_DELTA = 0.009;
 const LONGITUDE_DELTA = 0.009;
-var LATITUDE = 29.95539;
-var LONGITUDE = 78.07513;
+const DEFAULT_LATITUDE = 29.95539;
+const DEFAULT_LONGITUDE = 78.07513;
 
 const MapViewEnforce = ({ coordinate, height, getWFHInfo, locationName }) => {
   const mapRef = useRef(null);
   const geoCoder = useRef(new GeoCoder());
   const markerRef = useRef(null);
   const [hasError, setHasError] = useState(false);
-
-  var latitude = coordinate ? coordinate.latitude : LATITUDE;
-  var longitude = coordinate ? coordinate.longitude : LONGITUDE;
   const [draggable, setDraggable] = useState(true);
 
-  const [selectedCoordinate, setSelectedCoordinate] = useState({
-    latitude: latitude,
-    longitude: longitude,
-  });
-  const [userCurrentLcoation, setuserCurrentLcoation] = useState();
+  const initialCoordinate = coordinate || {
+    latitude: DEFAULT_LATITUDE,
+    longitude: DEFAULT_LONGITUDE
+  };
+
+  const [selectedCoordinate, setSelectedCoordinate] = useState(initialCoordinate);
+  const [userCurrentLocation, setUserCurrentLocation] = useState(initialCoordinate);
   const [address, setSelectedAddress] = useState("");
-
   const [region, setRegion] = useState({
-    longitude: longitude,
-    latitude: latitude,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
+    ...initialCoordinate,
+    latitudeDelta: LATITUDE_DELTA,
+    longitudeDelta: LONGITUDE_DELTA,
   });
 
+  // Initialize geocoder and set initial location
   useEffect(() => {
+    geoCoder.current.initiaLizeGeoCoder();
     if (coordinate) {
       setSelectedCoordinate(coordinate);
+      setUserCurrentLocation(coordinate);
+      updateRegion(coordinate);
     }
-    geoCoder.current.initiaLizeGeoCoder();
-  }, []);
-
-  useEffect(() => {
-    setuserCurrentLcoation(coordinate);
   }, [coordinate]);
 
+  // Update address display when locationName changes
   useEffect(() => {
-    let hasError = locationName != "" ? false : true;
-    setHasError(hasError);
-    setSelectedAddress(locationName);
+    const errorStatus = !locationName;
+    setHasError(errorStatus);
+    setSelectedAddress(locationName || "");
   }, [locationName]);
 
-  async function onDragabaleMarkerEvent(selectedCoordinate) {
-    setSelectedCoordinate(selectedCoordinate);
-    let isInRadius = UtilityHelper.isLocationWithinTheRadius(
-      selectedCoordinate,
-      coordinate,
-      500
-    );
-    if (isInRadius) {
-      let placeInfo = await geoCoder.current.getPlaceFromCordinate(
-        selectedCoordinate.latitude,
-        selectedCoordinate.longitude
-      );
-      let hasError = placeInfo.formatted_address ? false : true;
-      setHasError(hasError);
-      setSelectedAddress(placeInfo.formatted_address);
-      getWFHInfo(placeInfo);
-    } else {
-      Alert.alert(
-        "Dragging the marker outside the radius is not allowed",
-        "Please select precise location"
-      );
-      setDraggable(false);
-      if (coordinate) {
-        setSelectedCoordinate(userCurrentLcoation);
-        resetMapZoomLevel(userCurrentLcoation);
-      }
-    }
-  }
-
-  function resetMapZoomLevel(coordinatePoint) {
-    let region = {
-      latitude: coordinatePoint.latitude,
-      longitude: coordinatePoint.longitude,
+  const updateRegion = (coord) => {
+    setRegion({
+      ...coord,
       latitudeDelta: LATITUDE_DELTA,
       longitudeDelta: LONGITUDE_DELTA,
-    };
-    markerRef.current.animateMarkerToCoordinate(coordinatePoint, 100);
-    mapRef.current.animateToRegion(region, 100);
-  }
+    });
+  };
+
+  const handleMarkerDragEnd = async (newCoordinate) => {
+    const isInRadius = UtilityHelper.isLocationWithinTheRadius(
+      newCoordinate,
+      userCurrentLocation,
+      500
+    );
+
+    if (isInRadius) {
+      try {
+        const placeInfo = await geoCoder.current.getPlaceFromCordinate(
+          newCoordinate.latitude,
+          newCoordinate.longitude
+        );
+        setHasError(!placeInfo.formatted_address);
+        setSelectedAddress(placeInfo.formatted_address || "");
+        getWFHInfo(placeInfo);
+        setSelectedCoordinate(newCoordinate);
+      } catch (error) {
+        console.error("Geocoding error:", error);
+        handleOutOfRadius();
+      }
+    } else {
+      handleOutOfRadius();
+    }
+  };
+
+  const handleOutOfRadius = () => {
+    Alert.alert(
+      "Location Restriction",
+      "Dragging the marker outside the radius is not allowed. Please select precise location."
+    );
+    resetToCurrentLocation();
+  };
+
+  const resetToCurrentLocation = () => {
+    setDraggable(false);
+    setSelectedCoordinate(userCurrentLocation);
+    updateRegion(userCurrentLocation);
+    if (markerRef.current) {
+      markerRef.current.animateMarkerToCoordinate(userCurrentLocation, 100);
+    }
+    if (mapRef.current) {
+      mapRef.current.animateToRegion({
+        ...userCurrentLocation,
+        latitudeDelta: LATITUDE_DELTA,
+        longitudeDelta: LONGITUDE_DELTA,
+      }, 100);
+    }
+  };
 
   return (
-    <>
-      <MapView
-        provider={PROVIDER_GOOGLE}
-        ref={mapRef}
-        style={{ height: height, marginHorizontal: 10 }}
-        initialRegion={{
-          latitude: latitude,
-          longitude: longitude,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        }}
-        region={region}
-        onRegionChangeComplete={(region) => setRegion(region)}
-      >
-        <Circle
-          key={"19"}
-          center={selectedCoordinate}
-          radius={100}
-          fillColor="rgba(40, 109, 237, 0.14)"
-          strokeColor="rgba(40, 109, 237, 0.14)"
-          strokeWidth={1}
-        />
-        <Marker
-          ref={markerRef}
-          draggable={true}
-          zIndex={100}
-          coordinate={selectedCoordinate}
-          onPress={() => setDraggable(true)}
-          onDragEnd={(e) => onDragabaleMarkerEvent(e.nativeEvent.coordinate)}
+    <View style={styles.container}>
+      <View style={[styles.mapContainer, { height }]}>
+        <MapView
+          ref={mapRef}
+          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+          style={styles.map}
+          initialRegion={region}
+          region={region}
+          onRegionChangeComplete={setRegion}
+          showsUserLocation={true}
+          showsMyLocationButton={true}
+          loadingEnabled={true}
         >
-          <Marker.Animated
-            style={{ width: 50, height: 50 }}
-            coordinate={selectedCoordinate}
-            anchor={{ x: 0.5, y: 0.5 }}
-          >
-            <Icons name="location-pin" size={40} color="green" />
-          </Marker.Animated>
-        </Marker>
-      </MapView>
-      <View
-        style={{
-          marginHorizontal: 10,
-          marginTop: 5,
-          flexDirection: "row",
-          alignItems: "center",
-          marginRight: 20,
-        }}
-      >
-        <Icons name="location-pin" size={25} color="grey" />
-        <Text style={{ color: "grey", flex: 1, flexWrap: "wrap" }}>
+          <Circle
+            center={userCurrentLocation}
+            radius={100}
+            fillColor="rgba(40, 109, 237, 0.14)"
+            strokeColor="rgba(40, 109, 237, 0.14)"
+            strokeWidth={1}
+          />
+        </MapView>
+      </View>
+      
+      <View style={styles.addressContainer}>
+        <Icons name="map-marker" size={25} color="grey" />
+        <Text style={styles.addressText}>
           {hasError ? "Unable to fetch location" : address}
         </Text>
       </View>
-    </>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  mapContainer: {
+    marginHorizontal: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  marker: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addressContainer: {
+    marginHorizontal: 10,
+    marginTop: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 20,
+  },
+  addressText: {
+    color: "grey",
+    flex: 1,
+    flexWrap: "wrap",
+    marginLeft: 5,
+  },
+});
+
 export default MapViewEnforce;

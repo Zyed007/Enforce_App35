@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  Platform,
 } from "react-native";
 import { Picker } from '@react-native-picker/picker';
 import color from "../Theme/Colors";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import DateTimePicker from '@react-native-community/datetimepicker';
 import LinearGradient from "react-native-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -34,15 +34,8 @@ const ErrorAlertPopup = ({
   const storeDataReport = async () => {
     try {
       await AsyncStorage.setItem("newNameKey", selectedValue);
-      const timeValue = JSON.stringify({
-        hour: selectedHour,
-        minute: selectedMinute,
-        period: selectedPeriod
-      });
-      const formattedTime = `${selectedHour}:${selectedMinute}:00 ${selectedPeriod}`;
+      const formattedTime = `${selectedHour}:${selectedMinute} ${selectedPeriod}`;
       await AsyncStorage.setItem("forcetime", formattedTime);
-          console.log(selectedHour,selectedMinute,selectedPeriod,formattedTime,"formattedTime")
-
       modalLogoutAction();
     } catch (error) {
       console.error(error);
@@ -51,11 +44,7 @@ const ErrorAlertPopup = ({
 
   const onValueChange = (itemValue) => {
     setSelectedValue(itemValue);
-    if (itemValue === 'Forgot to Checkout') {
-      setShowTimePicker(true);
-    } else {
-      setShowTimePicker(false);
-    }
+    setShowTimePicker(itemValue === 'Forgot to Checkout');
   };
 
   return (
@@ -66,265 +55,240 @@ const ErrorAlertPopup = ({
       onRequestClose={modalCloseAlertAction}
     >
       <View style={styles.centeredView}>
-        <View style={styles.modalView}>
-          <View style={styles.containerView}>
-            <View style={styles.topView}>
-              {isForceCheckoutPopup && (
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={modalCloseAlertAction}
-                >
-                  <Icon name="close" size={30} color="grey" />
-                </TouchableOpacity>
-              )}
-              <View style={styles.modalContent}>
-                <Text style={styles.modalText1}>FORCE CHECKOUT</Text>
-                <Text style={styles.modalText2}>Are you sure to force check out?</Text>
-                <Text style={styles.modalText2}>Reason for Force Checkout</Text>
-                <Picker
-                  selectedValue={selectedValue}
-                  onValueChange={onValueChange}
-                >
-                  <Picker.Item label="Select an Option" value="" />
-                  <Picker.Item label="Forgot to Checkout" value="Forgot to Checkout" />
-                  <Picker.Item label="Still am in the Location" value="Still am in the Location" />
-                </Picker>
-                {showTimePicker && (
-                  <View style={styles.customPicker}>
-                    <Text style={{textAlign:'center'}}>Hour</Text>
-                    <Picker
-                      selectedValue={selectedHour}
-                      onValueChange={(item) => setSelectedHour(item)}
-                     
-                      
-                    >
-                      {hours.map(hour => (
-                        <Picker.Item key={hour} label={hour} value={hour} />
-                      ))}
-                    </Picker>
-                    <Text style={{textAlign:'center'}}>Minutes</Text>
-                    <Picker
-                      selectedValue={selectedMinute}
-                      onValueChange={(item) => setSelectedMinute(item)}
-                    
-                    >
-                      {minutes.map(minute => (
-                        <Picker.Item key={minute} label={minute} value={minute} />
-                      ))}
-                    </Picker>
-                    <Text style={{textAlign:'center'}}>AM/PM</Text>
-                    <Picker
-                      selectedValue={selectedPeriod}
-                      onValueChange={(item) => setSelectedPeriod(item)}
-                    
-                    >
-                      {periods.map(period => (
-                        <Picker.Item key={period} label={period} value={period} />
-                      ))}
-                    </Picker>
-                  </View>
-
-
-                )}
-              </View>
+        <View style={styles.modalContainer}>
+          <View style={styles.contentContainer}>
+            {isForceCheckoutPopup && (
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={modalCloseAlertAction}
+              >
+                <Icon name="close" size={24} color="grey" />
+              </TouchableOpacity>
+            )}
+            
+            <View style={styles.textContainer}>
+              <Text style={styles.titleText}>FORCE CHECKOUT</Text>
+              <Text style={styles.subtitleText}>Are you sure to force check out?</Text>
+              <Text style={styles.subtitleText}>Reason for Force Checkout</Text>
             </View>
-            {isForceCheckoutPopup ? (
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={modalCheckOutAction}
-                >
-                  <LinearGradient
-                    start={{ x: 0.5, y: 1.0 }}
-                    end={{ x: 0.0, y: 0.25 }}
-                    colors={["#fe717f", "#fa8576", "#f6976e"]}
-                    style={styles.checkInButton}
+
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={selectedValue}
+                onValueChange={onValueChange}
+                style={styles.mainPicker}
+                itemStyle={styles.pickerItem}
+              >
+                <Picker.Item label="Select an Option" value="" />
+                <Picker.Item label="Forgot to Checkout" value="Forgot to Checkout" />
+                <Picker.Item label="Still am in the Location" value="Still am in the Location" />
+              </Picker>
+            </View>
+
+            {showTimePicker && (
+              <View style={styles.timePickerContainer}>
+                <View style={styles.timePickerColumn}>
+                  <Text style={styles.timePickerLabel}>Hour</Text>
+                  <Picker
+                    selectedValue={selectedHour}
+                    onValueChange={setSelectedHour}
+                    style={styles.timePicker}
+                    itemStyle={styles.pickerItem}
                   >
-                    <Text style={styles.checkInText}>Check Out</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={modalEndOfWorkAction}
-                >
-                  <LinearGradient
-                    start={{ x: 0.5, y: 1.0 }}
-                    end={{ x: 0.0, y: 0.25 }}
-                    colors={["#fe717f", "#fa8576", "#f6976e"]}
-                    style={styles.checkInButton}
+                    {hours.map(hour => (
+                      <Picker.Item key={hour} label={hour} value={hour} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <View style={styles.timePickerColumn}>
+                  <Text style={styles.timePickerLabel}>Minutes</Text>
+                  <Picker
+                    selectedValue={selectedMinute}
+                    onValueChange={setSelectedMinute}
+                    style={styles.timePicker}
+                    itemStyle={styles.pickerItem}
                   >
-                    <Text style={styles.checkInText}>End of Day</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={modalCloseAlertAction}
-                >
-                  <Text style={styles.cancelButtonText}>No</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={storeDataReport}
-                >
-                  <LinearGradient
-                    start={{ x: 0.5, y: 1.0 }}
-                    end={{ x: 0.0, y: 0.25 }}
-                    colors={["#fe717f", "#fa8576", "#f6976e"]}
-                    style={styles.checkInButton}
+                    {minutes.map(minute => (
+                      <Picker.Item key={minute} label={minute} value={minute} />
+                    ))}
+                  </Picker>
+                </View>
+
+                <View style={styles.timePickerColumn}>
+                  <Text style={styles.timePickerLabel}>AM/PM</Text>
+                  <Picker
+                    selectedValue={selectedPeriod}
+                    onValueChange={setSelectedPeriod}
+                    style={styles.timePicker}
+                    itemStyle={styles.pickerItem}
                   >
-                    <Text style={styles.checkInText}>Yes</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
+                    {periods.map(period => (
+                      <Picker.Item key={period} label={period} value={period} />
+                    ))}
+                  </Picker>
+                </View>
               </View>
             )}
           </View>
+
+          <View style={styles.buttonContainer}>
+            {isForceCheckoutPopup ? (
+              <>
+                <TouchableOpacity
+                  style={[styles.button, styles.checkOutButton]}
+                  onPress={modalCheckOutAction}
+                >
+                  <Text style={styles.buttonText}>Check Out</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.endDayButton]}
+                  onPress={modalEndOfWorkAction}
+                >
+                  <Text style={styles.buttonText}>End of Day</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.button, styles.cancelButton]}
+                  onPress={modalCloseAlertAction}
+                >
+                  <Text style={[styles.buttonText, styles.cancelButtonText]}>No</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.confirmButton]}
+                  onPress={storeDataReport}
+                >
+                  <Text style={styles.buttonText}>Yes</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </View>
-        </View>
-    </Modal >
+      </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  customPicker:{
-    display:'flex',
-  },
   centeredView: {
-    alignItems: "center",
-    flexDirection: "column",
-  },
-  centeredView2: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  modalView: {
-    margin: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    width: "100%",
-    height: "100%",
-  },
-
-
-  modalsView: {
-    margin: 0,
-    backgroundColor: "white",
-    justifyContent: "center",
-    alignItems: "center",
-    width: "100%",
-    height: 100,
-  },
-
-  containerView: {
-    width: "80%",
-    margin: 40,
-    backgroundColor: "white",
+  modalContainer: {
+    width: '80%',
+    backgroundColor: 'white',
     borderRadius: 20,
-    shadowColor: "#000",
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  contentContainer: {
+    paddingBottom: 20,
   },
   closeButton: {
-    position: "absolute",
-    width: 40,
-    height: 40,
+    position: 'absolute',
     right: 10,
     top: 10,
+    zIndex: 1,
   },
-  topView: {
-    borderRadius: 20,
-    flexDirection: "column",
-    alignItems: "center",
+  textContainer: {
+    marginBottom: 20,
+    alignItems: 'center',
   },
-  modalContent: {
-    top: -30,
-    marginHorizontal: 20,
-  },
-  modalText1: {
-    textAlign: "center",
-    fontSize: 21,
-  },
-  modalText2: {
-    marginTop: 13,
-    textAlign: "center",
-    fontSize: 13,
+  titleText: {
+    fontSize: 16,
+    fontWeight: 'bold',
     color: color.darkGrey,
-    fontWeight: "bold",
+    marginBottom: 5,
   },
-  customText: {
-    textAlign: "center",
-    fontSize: 15,
+  subtitleText: {
+    fontSize: 16,
     color: color.darkGrey,
-    marginTop: 10,
     marginBottom: 10,
+    textAlign: 'center',
   },
-  buttonRow: {
-    flexDirection: "row",
-    marginHorizontal: 30,
-    justifyContent: "space-between",
-    marginBottom: 30,
+  pickerContainer: {
+    borderWidth: 2,
+    justifyContent: 'center',
+    borderColor: '#ccc',
+    borderRadius: 8,
+    marginBottom: 15,
+    overflow: 'hidden',
   },
-  actionButton: {
-    marginLeft: 10,
-    flex: 1,
-    justifyContent: "center",
-    alignSelf: "center",
+  mainPicker: {
+    width: '100%',
+    height: Platform.OS === 'ios' ? 150 : 50,
+    justifyContent: 'center',
   },
-  checkInButton: {
-    width: "100%",
-    height: 40,
-    borderRadius: 24,
-    alignSelf: "center",
-    justifyContent: "center",
-  },
-  checkInText: {
-    textAlign: "center",
-    fontSize: 15,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    color: color.white,
-  },
-  cancelButton: {
-    flex: 1,
-    marginRight: 10,
-    justifyContent: "center",
-    alignSelf: "center",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: color.pinkBorder,
-    height: 40,
-  },
-  cancelButtonText: {
-    textAlign: "center",
-    fontSize: 17,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    color: color.pinkBorder,
+  pickerItem: {
+    fontSize: 20,
   },
   timePickerContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    },
+  timePickerColumn: {
+    flex: 1,
     alignItems: 'center',
+    marginHorizontal: 0.5,
   },
-  picker: {
-    alignItems: 'center',
+  timePickerLabel: {
+    fontSize: 15,
+    color: color.darkGrey,
+    marginBottom: 8,
+  },
+  timePicker: {
+    width: '100%',
+    height: Platform.OS === 'ios' ? 200 : 50,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
     justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 5,
   },
-  item: {
-    fontSize: 100,
-    padding: 100,
-    color: 'black',
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
   },
-  selectedItem: {
-    fontSize: 100,
-    padding: 100,
-    color: 'blue',
-    fontWeight: 'bold',
+  checkOutButton: {
+    backgroundColor: color.pinkBorder,
   },
-  separator: {
-    fontSize: 10,
-    paddingHorizontal: 50,
+  endDayButton: {
+    backgroundColor: color.pinkBorder,
+  },
+  cancelButton: {
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: color.pinkBorder,
+  },
+  cancelButtonText: {
+    color: color.pinkBorder,
+  },
+  confirmButton: {
+    backgroundColor: color.pinkBorder,
   },
 });
 

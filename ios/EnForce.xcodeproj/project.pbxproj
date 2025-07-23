@@ -11,6 +11,7 @@
 		4C54100A0AA73B3545F68C9B /* libPods-EnForce.a in Frameworks */ = {isa = PBXBuildFile; fileRef = FBCDB9C24DD376F512523820 /* libPods-EnForce.a */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
+		A2CDDEFA2E30B65B00217085 /* OfficeToAbuDhabi.gpx in Resources */ = {isa = PBXBuildFile; fileRef = A2CDDEF92E30B65B00217085 /* OfficeToAbuDhabi.gpx */; };
 		C4968868B46E1F161F07FE6D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
@@ -22,6 +23,7 @@
 		4D3627DE569B009B2502BB7B /* Pods-EnForce.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-EnForce.release.xcconfig"; path = "Target Support Files/Pods-EnForce/Pods-EnForce.release.xcconfig"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = EnForce/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = EnForce/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		A2CDDEF92E30B65B00217085 /* OfficeToAbuDhabi.gpx */ = {isa = PBXFileReference; lastKnownFileType = text; path = OfficeToAbuDhabi.gpx; sourceTree = "<group>"; };
 		BD135D5450AFC7B0C81E7E3D /* Pods-EnForce.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-EnForce.debug.xcconfig"; path = "Target Support Files/Pods-EnForce/Pods-EnForce.debug.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FBCDB9C24DD376F512523820 /* libPods-EnForce.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-EnForce.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -70,6 +72,7 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				A2CDDEF92E30B65B00217085 /* OfficeToAbuDhabi.gpx */,
 				13B07FAE1A68108700A75B9A /* EnForce */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
@@ -158,6 +161,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A2CDDEFA2E30B65B00217085 /* OfficeToAbuDhabi.gpx in Resources */,
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				C4968868B46E1F161F07FE6D /* PrivacyInfo.xcprivacy in Resources */,

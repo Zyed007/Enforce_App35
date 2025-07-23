@@ -21,7 +21,7 @@ export default StyleSheet.create({
   },
   titleText: {
     color: Colors.white,
-    fontSize: 17,
+    fontSize: 20,
     fontWeight: '700',
     textAlign: 'center',
     width: '75%'

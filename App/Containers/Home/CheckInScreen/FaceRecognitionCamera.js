@@ -8,9 +8,12 @@ import {
 } from 'react-native-vision-camera';
 //import { useFaceDetector } from 'react-native-vision-camera-face-detector';
 import RNFS from 'react-native-fs';
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import Loader from "../../../Components/Loader";
+import { useNavigation } from '@react-navigation/native';
 
 const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss }) => {
+  const navigation = useNavigation();
   const cameraRef = useRef(null);
   const [isActive, setIsActive] = useState(true);
   const [hasPermission, setHasPermission] = useState(false);
@@ -117,6 +120,17 @@ const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss }) => {
           photo={true}
         />
       )}
+
+
+      <TouchableOpacity 
+        style={styles.backButton} 
+        onPress={() => {
+          setIsActive(false);
+          navigation.goBack();
+        }}
+      >
+        <Icon name="arrow-left" size={30} color="white" />
+      </TouchableOpacity>
       
       <View style={styles.overlay}>
         <View style={styles.faceGuide} />
@@ -144,7 +158,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     position: 'absolute',
-    bottom: 50,
+    top: 250,
     width: '100%',
     alignItems: 'center',
   },
@@ -160,6 +174,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     padding: 15,
     borderRadius: 20,
+  },
+   backButton: {
+    position: 'absolute',
+    top: 60,
+    left: 30,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 25,
+    padding: 10,
   },
   countdownText: {
     color: 'white',
