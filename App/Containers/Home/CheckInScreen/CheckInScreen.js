@@ -53,6 +53,13 @@ import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import RNFS from 'react-native-fs';
 import FaceRecognitionCamera from './FaceRecognitionCamera';
 
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { TabView, TabBar } from 'react-native-tab-view';
+
+import { MaterialTopTabBar } from '@react-navigation/material-top-tabs';
+
+
+
 
 //new imports
 const addLog = (message) => {
@@ -72,6 +79,21 @@ var counter = 0;
 var counter_face_data = 0;
 const timerId = 0;
 var faceimage;
+
+const JobTab = ({ parent }) => {
+  return parent.renderJobTabView();
+};
+
+const CaseTab = ({ parent }) => {
+  return parent.renderCaseTabView();
+};
+
+const PlaceTab = ({ parent }) => {
+  return parent.renderPlaceTabView();
+};
+
+const Tab = createMaterialTopTabNavigator();
+
 
 
 export default class CheckInScreen extends React.Component {
@@ -341,6 +363,37 @@ async componentDidMount() {
   }
 }
 
+
+onTabChange = (routeName) => {
+  let tabIndex = 2; // default is Place
+
+  if (routeName === 'Job') tabIndex = 0;
+  else if (routeName === 'Case') tabIndex = 1;
+  else if (routeName === 'Place') tabIndex = 2;
+
+  this.setState({ selectedTab: tabIndex });
+};
+
+renderCustomTabBar = (props) => {
+  return (
+    <LinearGradient
+      start={{ x: 0.5, y: 1.0 }}
+      end={{ x: 0.0, y: 0.25 }}
+      colors={this.getNavigationColor()}
+    >
+      <MaterialTopTabBar
+        {...props}
+        style={{
+          backgroundColor: 'transparent',
+        }}
+        activeTintColor="black"
+        inactiveTintColor="gray"
+        labelStyle={{ fontSize: 20, fontWeight: 'bold' }}
+        indicatorStyle={{ backgroundColor: 'black' }}
+      />
+    </LinearGradient>
+  );
+};
   // Helper method to validate location
   hasValidLocation = () => {
     return this.currentLocationObj.latitude !== 0 &&
@@ -1870,24 +1923,24 @@ addTimesheetCheckIn = async () => {
       this.setState({ getAllOutsourceList: getDepartmentName });
     }
   };
-  setSelectedTab(value) {
-    this.setState({
-      selectedTab: value,
-      enableStartButton: value === 0 ? true : false,
-    });
-    switch (value) {
-      case 0:
-        this.renderJobTabView();
-        this.isAllowtocheckin = true;
-      case 1:
-        this.isAllowtocheckin = true;
-        this.renderCaseTabView();
-      case 2:
-        this.renderPlaceTabView();
-        this.setState({ isOffice: true, getSelectedProjectData: {} })
-        this.onChoosePlaceOffice(true)
-    }
-  }
+  // setSelectedTab(value) {
+  //   this.setState({
+  //     selectedTab: value,
+  //     enableStartButton: value === 0 ? true : false,
+  //   });
+  //   switch (value) {
+  //     case 0:
+  //       this.renderJobTabView();
+  //       this.isAllowtocheckin = true;
+  //     case 1:
+  //       this.isAllowtocheckin = true;
+  //       this.renderCaseTabView();
+  //     case 2:
+  //       this.renderPlaceTabView();
+  //       this.setState({ isOffice: true, getSelectedProjectData: {} })
+  //       this.onChoosePlaceOffice(true)
+  //   }
+  // }
   clearWhileTap() {
     this.state.getAllTeamData = [];
     this.state.isTeamClicked = false;
@@ -2852,6 +2905,7 @@ addTimesheetCheckIn = async () => {
       });
     }
   };
+
   onChoosePlaceWrkFrmHome = (value) => {
     this.isAllowtocheckin = true;
     this.setState({
@@ -2861,10 +2915,12 @@ addTimesheetCheckIn = async () => {
       isPlace: false,
     });
   };
+
   onChoosePlaceManual = (value) => {
     this.isAllowtocheckin = true;
     this.setState({ isManual: value, isWorkFromHome: false, isOffice: false });
   };
+
   onChoosePlace = (value) => {
     this.isAllowtocheckin = true;
     this.setState({
@@ -2874,6 +2930,7 @@ addTimesheetCheckIn = async () => {
       isWorkFromHome: false,
     });
   };
+
   setLocationName = (value) => {
     console.log(value);
     if (this.state.isManual) {
@@ -2903,9 +2960,11 @@ addTimesheetCheckIn = async () => {
       </View>
     );
   }
+
   getWFHInfo = (placeInfo) => {
     this.currentLocationObj = placeInfo;
   };
+
   renderPlaceTabView() {
     const {
       isPlace,
@@ -2915,7 +2974,7 @@ addTimesheetCheckIn = async () => {
       officeAddressPlace,
     } = this.state;
     return (
-      <View>
+      <View style={{ backgroundColor: 'white' }}>
         <SwitchViewNew
           onChooseOffice={(value) => this.onChoosePlaceOffice(true)}
           isOffice={this.state.isOffice}
@@ -2988,17 +3047,18 @@ addTimesheetCheckIn = async () => {
       // </ScrollView>
     );
   }
-  getCurrentPage() {
-    if (this.state.selectedTab == 0) {
-      return this.renderJobTabView();
-    }
-    if (this.state.selectedTab == 1) {
-      return this.renderCaseTabView();
-    }
-    if (this.state.selectedTab == 2) {
-      return this.renderPlaceTabView();
-    }
-  }
+  
+  // getCurrentPage() {
+  //   if (this.state.selectedTab == 0) {
+  //     return this.renderJobTabView();
+  //   }
+  //   if (this.state.selectedTab == 1) {
+  //     return this.renderCaseTabView();
+  //   }
+  //   if (this.state.selectedTab == 2) {
+  //     return this.renderPlaceTabView();
+  //   }
+  // }
   getMapRegion = () => ({
     latitude: this.locationRegionObj.latitude
       ? this.locationRegionObj.latitude
@@ -3217,6 +3277,7 @@ getLoctionObj = async (locationObj) => {
             isInRadiusOrNot={(isInRadius) => this.isInRadius(isInRadius)}
             isInitialLoad={this.state.isInitialLoad}
           />
+          
           {/* <Loader loading={isLoading} /> */}
           {this.renderRegistrationSuccessPopup()}
           {this.renderCamera()}
@@ -3252,38 +3313,78 @@ getLoctionObj = async (locationObj) => {
                   width: 60,
                   marginHorizontal: 24,
                   marginTop: 40,
+                  marginBottom: 30,
                   backgroundColor: "transparent",
                 }}
                 onPress={() => this.onGoBackToPrevious()}
               >
                 <Icon name="angle-left" size={30} color="white" />
               </TouchableOpacity>
+              
               <View style={{ marginTop: 40, flex: 1, alignSelf: "center" }}>
-                <Text style={styles.titleText}>Checkin</Text>
+                <Text style={{  marginBottom: 30,fontSize: 20,fontWeight: "700", color:"#ffff"}}>Checkin</Text>
               </View>
               <View style={{ marginTop: 40, flex: 1 }}></View>
             </View>
+            
           </LinearGradient>
+
           <LinearGradient
             start={{ x: 0.5, y: 1.0 }}
             end={{ x: 0.0, y: 0.25 }}
             colors={this.getNavigationColor()}
           >
 
+            
           </LinearGradient>
-          <ScrollView
-            contentContainerStyle={{ paddingBottom: 60 }}
-            ref={(ref) => {
-              this.scrollView = ref;
-            }}
-            onContentSizeChange={() =>
-              this.scrollView.scrollToEnd({ animated: true })
-            }
-            style={{ marginBottom: 20 }}
-          >
-            {this.getCurrentPage()}
-            {this.renderTeamsView()}
-          </ScrollView>
+          
+<Tab.Navigator
+  style={{ marginTop: -30 }}
+  initialRouteName="Place"
+  screenOptions={{
+    swipeEnabled: true,
+    tabBarStyle: {
+      backgroundColor: "#e0e0e0", // ← Light Grey
+    },
+    tabBarLabelStyle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: "black",
+    },
+    tabBarIndicatorStyle: {
+      backgroundColor: "black",
+    },
+  }}
+  screenListeners={{
+    state: (e) => {
+      const routeName = e.data.state.routes[e.data.state.index].name;
+      this.onTabChange(routeName);
+    },
+  }}
+>
+
+              
+              
+              <Tab.Screen name="Job">
+                {() => <JobTab parent={this} />}
+              </Tab.Screen>
+              <Tab.Screen name="Case">
+                {() => <CaseTab parent={this} />}
+              </Tab.Screen>
+              <Tab.Screen name="Place">
+                {() => (
+                  <ScrollView
+                    contentContainerStyle={{ flexGrow: 1, paddingBottom: 60, backgroundColor:"white" }}
+                  >
+                    <PlaceTab parent={this} />
+                    {this.renderTeamsView()}
+                  </ScrollView>
+                )}
+              </Tab.Screen>
+          </Tab.Navigator>
+
+
+          
           <View style={{ flexDirection: "row", marginHorizontal: 24 }}>
             {findProjectDetails === null && selectedTab == 0 ? (
               <View
@@ -3464,9 +3565,6 @@ getLoctionObj = async (locationObj) => {
 
 
                 ) : null
-
-
-
             }
 
 
