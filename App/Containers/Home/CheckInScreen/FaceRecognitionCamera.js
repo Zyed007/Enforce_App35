@@ -21,8 +21,7 @@ const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState(5);
 
-  const device = useCameraDevice('front');   
-  
+  const device = useCameraDevice('front');
 
   // Face detection configuration
   const faceDetectionOptions = {

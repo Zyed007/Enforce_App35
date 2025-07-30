@@ -693,7 +693,9 @@ renderCustomTabBar = (props) => {
       await this.camera
         .takePictureAsync({
           base64: true,
-          quality: 0.5,
+          quality: 0.3,
+          width: 640, 
+          height: 480,
         })
         .then((data) => {
           base64 = data.base64;
@@ -2965,88 +2967,88 @@ addTimesheetCheckIn = async () => {
     this.currentLocationObj = placeInfo;
   };
 
-renderPlaceTabView() {
-  const {
-    isPlace,
-    isManual,
-    isOffice,
-    isWorkFromHome,
-    officeAddressPlace,
-    manualAddress
-  } = this.state;
+  renderPlaceTabView() {
+    const {
+      isPlace,
+      isManual,
+      isOffice,
+      isWorkFromHome,
+      officeAddressPlace,
+    } = this.state;
+    return (
+      <View style={{ backgroundColor: 'white' }}>
+        <SwitchViewNew
+          onChooseOffice={(value) => this.onChoosePlaceOffice(true)}
+          isOffice={this.state.isOffice}
+          onChooseWrkFromHome={(value) => this.onChoosePlaceWrkFrmHome(value)}
+          isWorkFromHome={this.state.isWorkFromHome}
+          onChoosePlace={(value) => this.onChoosePlace(value)}
+          isPlace={this.state.isPlace}
+        />
+        {this.state.isOffice && !this.state.isPlace && this.state.officeAddressPlace.length > 0 ? (
+          <DropDownPicker
+            open={this.state.dropdownOpen}
+            value={this.state.selectedOfficeValue}
+            items={this.state.officeAddressPlace}
+            setOpen={(open) => this.setState({ dropdownOpen: open })}
+            setValue={(callback) => {
+              const value = callback(this.state.selectedOfficeValue);
+              const selectedItem = this.state.officeAddressPlace.find(item => item.value === value);
+              const index = this.state.officeAddressPlace.findIndex(item => item.value === value);
+              this.setState({ selectedOfficeValue: value });
+              this.onSelectOfficeLocation(selectedItem, index);
+            }}
+            setItems={(items) => this.setState({ officeAddressPlace: items })}
+            placeholder="Select office"
+            searchable={true}
+            searchPlaceholder="Search for office"
+            containerStyle={{
+              height: 60,
+              width: '90%',
+              alignSelf: 'center',
+              marginTop: 20,
+            }}
+            style={[
+              styles.dropDownContainer,
+              { marginTop: 5, backgroundColor: 'lightgrey' },
+            ]}
+            dropDownContainerStyle={{
+              backgroundColor: '#fcfcfc',
+              zIndex: 10000,
+            }}
+            textStyle={{
+              fontSize: 16,
+              color: '#000',
+            }}
+          />
 
-  return (
-    <View style={{ backgroundColor: 'white' }}>
-      <SwitchViewNew
-        onChooseOffice={(value) => this.onChoosePlaceOffice(true)}
-        isOffice={this.state.isOffice}
-        onChooseWrkFromHome={(value) => this.onChoosePlaceWrkFrmHome(value)}
-        isWorkFromHome={this.state.isWorkFromHome}
-        onChoosePlace={(value) => this.onChoosePlace(value)}
-        isPlace={this.state.isPlace}
-      />
-      
-      {this.state.isOffice && !this.state.isPlace && this.state.officeAddressPlace.length > 0 ? (
-        <DropDownPicker
-          open={this.state.dropdownOpen}
-          value={this.state.selectedOfficeValue}
-          items={this.state.officeAddressPlace}
-          setOpen={(open) => this.setState({ dropdownOpen: open })}
-          setValue={(callback) => {
-            const value = callback(this.state.selectedOfficeValue);
-            const selectedItem = this.state.officeAddressPlace.find(item => item.value === value);
-            const index = this.state.officeAddressPlace.findIndex(item => item.value === value);
-            this.setState({ selectedOfficeValue: value });
-            this.onSelectOfficeLocation(selectedItem, index);
-          }}
-          setItems={(items) => this.setState({ officeAddressPlace: items })}
-          placeholder="Select office"
-          searchable={true}
-          searchPlaceholder="Search for office"
-          containerStyle={{
-            height: 60,
-            width: '90%',
-            alignSelf: 'center',
-            marginTop: 20,
-          }}
-          style={[
-            styles.dropDownContainer,
-            { marginTop: 5, backgroundColor: 'lightgrey' },
-          ]}
-          dropDownContainerStyle={{
-            backgroundColor: '#fcfcfc',
-            zIndex: 10000,
-          }}
-          textStyle={{
-            fontSize: 16,
-            color: '#000',
-          }}
-        />
-      ) : (
-        <LocationText
-          locationName={this.state.isManual ? this.state.manualAddress : this.getLocationAddressForPlace()}
-          isEditabe={this.state.isManual}
-          setLocationName={(text) => this.setLocationName(text)}
-        />
-      )}
+        ) : (
+          <LocationText
+            //locationName={"this.getLocationName()"}
+            locationName={ this.getLocationAddressForPlace()}
+            isEditabe={this.state.isManual}
+            setLocationName={(text) => this.setLocationName(text)}
+          />
+        )}
 
-      {isPlace && (
-        <MapViewEnforce
-          coordinate={this.cordinateObj}
-          height={windowHeight * 0.4}
-          locationName={this.getLocationAddressForPlace()}
-          getWFHInfo={(placeInfo) => this.getWFHInfo(placeInfo)}
-        />
-      )}
-      
-      {!isWorkFromHome && (
-        <View style={[styles.teamContainer, { marginLeft: 24 }]}>
-          {this.renderTeamSwitch()}
-        </View>
-      )}
-    </View>
-  );
-}
+        {isPlace && (
+          <MapViewEnforce
+            coordinate={this.cordinateObj}
+            height={windowHeight * 0.4}
+            locationName={this.getLocationAddressForPlace()}
+            getWFHInfo={(placeInfo) => this.getWFHInfo(placeInfo)}
+          />
+        )}
+        {!isWorkFromHome && (
+          <View style={[styles.teamContainer, { marginLeft: 24 }]}>
+            {this.renderTeamSwitch()}
+          </View>
+        )}
+      </View>
+
+      // </ScrollView>
+    );
+  }
   
   // getCurrentPage() {
   //   if (this.state.selectedTab == 0) {
