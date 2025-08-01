@@ -693,9 +693,7 @@ renderCustomTabBar = (props) => {
       await this.camera
         .takePictureAsync({
           base64: true,
-          quality: 0.3,
-          width: 640, 
-          height: 480,
+          quality: 0.5,
         })
         .then((data) => {
           base64 = data.base64;
@@ -879,101 +877,37 @@ renderCustomTabBar = (props) => {
 
 
 
-  verifyFace = async (base64) => {
-    const employeeDetails = await getData(LocalDBItems.employeeDetails);
-    // const faceID = await getData(LocalDBItems.saveFaceIDData);
-    // console.log(faceID,"CHECKface!")
-    try {
-      const filename = `${employeeDetails.first_name.toLowerCase()}.jpeg`;
-      const collection_id = `face-collection-${employeeDetails.first_name.toLowerCase()}`;
-      var faceVerifyResult = await searchFaceImages(
-        base64,
-        filename,
-        collection_id
-      );
-      console.log(faceVerifyResult, "check face result")
-      const faceResult = faceVerifyResult.FaceMatches;
-      console.log(faceResult, "check face result 2")
-      console.log("counter face", counter_face_data)
-      if (counter_face_data < 2) {
-        if (
-          faceVerifyResult.statusCode === 400 &&
-          !this.state.showAlertIdNoFace
-        ) {
-          this.count += 1;
-          if (this.count != -1) {
-            this.takePicture();
-          }
-          if (this.count == 2) {
-            this.setState({ showAlertIdNoFace: true, isVerifyFace: false });
-            this.count = 0;
-            clearInterval(this.timer);
-          }
-        } else {
-          if (faceResult && faceResult.length > 0 && faceResult[0].Face) {
-            if (faceResult[0].Face.hasOwnProperty("ExternalImageId")) {
-              if (
-                faceResult[0].Face.ExternalImageId.includes(
-                  employeeDetails.first_name.toLowerCase()
-                )
-              ) {
-                if (this.state.isTeamClicked) {
-                  this.employeeDetails.isFaceVerified = true;
-                  clearInterval(this.timer);
-                  // First checkin with admin user and after verification show other members to verify face
-                  if (this.modalizeRef.current) {
-                    this.ModalOpen = true;
-                    this.modalizeRef.current.open();
-                  }
-                } else {
-                  // This is for single checkin
-                  console.log("Sigle Checkin")
-                  if (this.state.isForceCheckIn == true) {
-                    console.log("Checin in the First area");
-                    this.addTimesheetForceCheckIn();
-                  }
-                  else {
-                    console.log("Datais hre");
-                    this.addTimesheetCheckIn();
-                  }
-                }
-              } else {
-                this.count += 1;
-                this.takePicture();
-                if (this.count == 2) {
-                  this.setState({ showAlertIdNoFace: true, isVerifyFace: false });
-                  this.count = 0;
-                  clearInterval(this.timer);
-                }
-              }
-            } else {
-              this.count += 1;
-              this.takePicture();
-              if (this.count == 2) {
-                this.setState({ showAlertIdNoFace: true, isVerifyFace: false });
-                this.count = 0;
-              }
-            }
-          } else {
-            this.count += 1;
-            this.takePicture();
-            if (this.count == 2) {
-              this.setState({ showAlertIdNoFace: true, isVerifyFace: false });
-              this.count = 0;
-            }
-          }
-        }
-      }
-      else {
-        {
-          console.log("FaceError")
-          this.takeErrorPicture();
-          this.count = 0;
+verifyFace = async (base64) => {
+  const employeeDetails = await getData(LocalDBItems.employeeDetails);
+  try {
+    const filename = `${employeeDetails.first_name.toLowerCase()}.jpeg`;
+    const collection_id = `face-collection-${employeeDetails.first_name.toLowerCase()}`;
+    var faceVerifyResult = await searchFaceImages(base64, filename, collection_id);
+    
+    const faceResult = faceVerifyResult.FaceMatches;
+    
+    if (faceVerifyResult.statusCode === 400 || !faceResult?.length) {
+      // Face recognition failed - STAY on CheckInScreen
+      this.setState({ 
+        showAlertIdNoFace: true,
+        isVerifyFace: false 
+      });
+      return false; // Prevent navigation
+    }
 
-        }
-      }
-    } catch (err) { }
-  };
+    // If face matches, proceed with check-in
+    if (this.state.isForceCheckIn) {
+      await this.addTimesheetForceCheckIn();
+    } else {
+      await this.addTimesheetCheckIn(); // This will handle HomeScreen navigation
+    }
+    return true;
+
+  } catch (err) {
+    this.setState({ isVerifyFace: false });
+    return false;
+  }
+};
 
 
 
@@ -2717,20 +2651,31 @@ addTimesheetCheckIn = async () => {
     );
   }
 
-  handlePhotoTaken = async (base64Photo) => {
-    addLog("Photo captured successfully");
-    try {
-      if (this.state.isGroupVerifyClicked) {
-        addLog("Processing group verification");
-        await this.verifyGroupCheckin(base64Photo);
-      } else {
-        addLog("Processing individual verification");
-        await this.verifyFace(base64Photo);
-      }
-    } catch (error) {
-      addLog(`Photo processing failed: ${error}`);
+handlePhotoTaken = async (base64Photo) => {
+  addLog("Photo captured successfully");
+  try {
+    let verificationSuccess = false;
+    
+    if (this.state.isGroupVerifyClicked) {
+      addLog("Processing group verification");
+      await this.verifyGroupCheckin(base64Photo);
+      verificationSuccess = true;
+    } else {
+      addLog("Processing individual verification");
+      verificationSuccess = await this.verifyFace(base64Photo);
     }
-  };
+
+    // Return verification result to camera component
+    return verificationSuccess;
+    
+  } catch (error) {
+    addLog(`Photo processing failed: ${error}`);
+    return false;
+  } finally {
+    // Ensure loader is hidden when done
+    this.setState({ showCameraLoader: false });
+  }
+};
 
 
   // Face detection
@@ -2967,88 +2912,88 @@ addTimesheetCheckIn = async () => {
     this.currentLocationObj = placeInfo;
   };
 
-  renderPlaceTabView() {
-    const {
-      isPlace,
-      isManual,
-      isOffice,
-      isWorkFromHome,
-      officeAddressPlace,
-    } = this.state;
-    return (
-      <View style={{ backgroundColor: 'white' }}>
-        <SwitchViewNew
-          onChooseOffice={(value) => this.onChoosePlaceOffice(true)}
-          isOffice={this.state.isOffice}
-          onChooseWrkFromHome={(value) => this.onChoosePlaceWrkFrmHome(value)}
-          isWorkFromHome={this.state.isWorkFromHome}
-          onChoosePlace={(value) => this.onChoosePlace(value)}
-          isPlace={this.state.isPlace}
+renderPlaceTabView() {
+  const {
+    isPlace,
+    isManual,
+    isOffice,
+    isWorkFromHome,
+    officeAddressPlace,
+    manualAddress
+  } = this.state;
+
+  return (
+    <View style={{ backgroundColor: 'white' }}>
+      <SwitchViewNew
+        onChooseOffice={(value) => this.onChoosePlaceOffice(true)}
+        isOffice={this.state.isOffice}
+        onChooseWrkFromHome={(value) => this.onChoosePlaceWrkFrmHome(value)}
+        isWorkFromHome={this.state.isWorkFromHome}
+        onChoosePlace={(value) => this.onChoosePlace(value)}
+        isPlace={this.state.isPlace}
+      />
+      
+      {this.state.isOffice && !this.state.isPlace && this.state.officeAddressPlace.length > 0 ? (
+        <DropDownPicker
+          open={this.state.dropdownOpen}
+          value={this.state.selectedOfficeValue}
+          items={this.state.officeAddressPlace}
+          setOpen={(open) => this.setState({ dropdownOpen: open })}
+          setValue={(callback) => {
+            const value = callback(this.state.selectedOfficeValue);
+            const selectedItem = this.state.officeAddressPlace.find(item => item.value === value);
+            const index = this.state.officeAddressPlace.findIndex(item => item.value === value);
+            this.setState({ selectedOfficeValue: value });
+            this.onSelectOfficeLocation(selectedItem, index);
+          }}
+          setItems={(items) => this.setState({ officeAddressPlace: items })}
+          placeholder="Select office"
+          searchable={true}
+          searchPlaceholder="Search for office"
+          containerStyle={{
+            height: 60,
+            width: '90%',
+            alignSelf: 'center',
+            marginTop: 20,
+          }}
+          style={[
+            styles.dropDownContainer,
+            { marginTop: 5, backgroundColor: 'lightgrey' },
+          ]}
+          dropDownContainerStyle={{
+            backgroundColor: '#fcfcfc',
+            zIndex: 10000,
+          }}
+          textStyle={{
+            fontSize: 16,
+            color: '#000',
+          }}
         />
-        {this.state.isOffice && !this.state.isPlace && this.state.officeAddressPlace.length > 0 ? (
-          <DropDownPicker
-            open={this.state.dropdownOpen}
-            value={this.state.selectedOfficeValue}
-            items={this.state.officeAddressPlace}
-            setOpen={(open) => this.setState({ dropdownOpen: open })}
-            setValue={(callback) => {
-              const value = callback(this.state.selectedOfficeValue);
-              const selectedItem = this.state.officeAddressPlace.find(item => item.value === value);
-              const index = this.state.officeAddressPlace.findIndex(item => item.value === value);
-              this.setState({ selectedOfficeValue: value });
-              this.onSelectOfficeLocation(selectedItem, index);
-            }}
-            setItems={(items) => this.setState({ officeAddressPlace: items })}
-            placeholder="Select office"
-            searchable={true}
-            searchPlaceholder="Search for office"
-            containerStyle={{
-              height: 60,
-              width: '90%',
-              alignSelf: 'center',
-              marginTop: 20,
-            }}
-            style={[
-              styles.dropDownContainer,
-              { marginTop: 5, backgroundColor: 'lightgrey' },
-            ]}
-            dropDownContainerStyle={{
-              backgroundColor: '#fcfcfc',
-              zIndex: 10000,
-            }}
-            textStyle={{
-              fontSize: 16,
-              color: '#000',
-            }}
-          />
+      ) : (
+        <LocationText
+          locationName={this.state.isManual ? this.state.manualAddress : this.getLocationAddressForPlace()}
+          isEditabe={this.state.isManual}
+          setLocationName={(text) => this.setLocationName(text)}
+        />
+      )}
 
-        ) : (
-          <LocationText
-            //locationName={"this.getLocationName()"}
-            locationName={ this.getLocationAddressForPlace()}
-            isEditabe={this.state.isManual}
-            setLocationName={(text) => this.setLocationName(text)}
-          />
-        )}
-
-        {isPlace && (
-          <MapViewEnforce
-            coordinate={this.cordinateObj}
-            height={windowHeight * 0.4}
-            locationName={this.getLocationAddressForPlace()}
-            getWFHInfo={(placeInfo) => this.getWFHInfo(placeInfo)}
-          />
-        )}
-        {!isWorkFromHome && (
-          <View style={[styles.teamContainer, { marginLeft: 24 }]}>
-            {this.renderTeamSwitch()}
-          </View>
-        )}
-      </View>
-
-      // </ScrollView>
-    );
-  }
+      {isPlace && (
+        <MapViewEnforce
+          coordinate={this.cordinateObj}
+          height={windowHeight * 0.4}
+          locationName={this.getLocationAddressForPlace()}
+          getWFHInfo={(placeInfo) => this.getWFHInfo(placeInfo)}
+        />
+      )}
+      
+      {!isWorkFromHome && (
+        <View style={[styles.teamContainer, { marginLeft: 24 }]}>
+          {this.renderTeamSwitch()}
+        </View>
+      )}
+    </View>
+  );
+}
   
   // getCurrentPage() {
   //   if (this.state.selectedTab == 0) {

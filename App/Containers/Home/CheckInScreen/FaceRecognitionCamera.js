@@ -6,31 +6,21 @@ import {
   useCameraDevice,
   useCameraPermission,
 } from 'react-native-vision-camera';
-//import { useFaceDetector } from 'react-native-vision-camera-face-detector';
 import RNFS from 'react-native-fs';
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import Loader from "../../../Components/Loader";
 import { useNavigation } from '@react-navigation/native';
 
-const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss }) => {
-  const navigation = useNavigation();
+const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss, navigation }) => {
   const cameraRef = useRef(null);
   const [isActive, setIsActive] = useState(true);
   const [hasPermission, setHasPermission] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState(5);
+  const [verificationComplete, setVerificationComplete] = useState(false);
 
   const device = useCameraDevice('front');
-
-  // Face detection configuration
-  const faceDetectionOptions = {
-    performanceMode: 'fast',
-    landmarkMode: 'none',
-    contourMode: 'none',
-    minFaceSize: 0.1, // Lower threshold to detect partial faces
-  };
-  //const { faces, detectFaces } = useFaceDetector(faceDetectionOptions);
 
   // Request camera permissions
   useEffect(() => {
@@ -43,7 +33,7 @@ const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss }) => {
 
   // Auto capture after 5 seconds
   useEffect(() => {
-    if (!hasPermission || !device) return;
+    if (!hasPermission || !device || verificationComplete) return;
 
     const timer = setInterval(() => {
       setCountdown(prev => {
@@ -57,35 +47,35 @@ const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss }) => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [hasPermission, device]);
+  }, [hasPermission, device, verificationComplete]);
 
-  const capturePhoto = async () => {
-    try {
-      if (!cameraRef.current) return;
-      
-      setIsLoading(true);
-      setIsActive(false); // Freeze the camera
+const capturePhoto = async () => {
+  try {
+    if (!cameraRef.current) return;
+    
+    setIsLoading(true);
+    setIsActive(false);
 
-      const photo = await cameraRef.current.takePhoto({
-        qualityPrioritization: 'speed',
-        flash: 'off',
-        skipMetadata: true,
-      });
+    const photo = await cameraRef.current.takePhoto({
+      qualityPrioritization: 'speed',
+      flash: 'off',
+      skipMetadata: true,
+    });
 
-      // Read file as base64
-      const base64 = await RNFS.readFile(photo.path, 'base64');
-      setCapturedPhoto(`data:image/jpeg;base64,${base64}`);
-      
-      // Process the photo
-      await onPhotoTaken(base64);
-      
-    } catch (error) {
-      console.error('Capture error:', error);
-      Alert.alert('Error', 'Failed to capture photo');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    const base64 = await RNFS.readFile(photo.path, 'base64');
+    setCapturedPhoto(`data:image/jpeg;base64,${base64}`);
+    
+    // Pass navigation control back to CheckInScreen
+    await onPhotoTaken(base64); 
+    
+  } catch (error) {
+    console.error('Capture error:', error);
+    Alert.alert('Error', 'Failed to capture photo');
+    navigation.goBack(); // Go back to CheckInScreen on error
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   if (!hasPermission) {
     return (
@@ -120,7 +110,6 @@ const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss }) => {
           photo={true}
         />
       )}
-
 
       <TouchableOpacity 
         style={styles.backButton} 
