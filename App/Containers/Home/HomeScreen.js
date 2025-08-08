@@ -521,35 +521,36 @@ getCurrentLocation = () => {
 
     return targetTime.format('MM/DD/YYYY HH:mm:ss');
   };
-  forceCheckOut = async (isEndOfWork = false) => {
-    console.log('Forcecehckoutfunction')
-    console.log('post checkout', this.currentLocationObj)
-    const value = await AsyncStorage.getItem("newNameKey")
+forceCheckOut = async (isEndOfWork = false) => {
+    console.log('Forcecehckoutfunction');
+    console.log('post checkout', this.currentLocationObj);
+  
+    const value = await AsyncStorage.getItem("newNameKey");
     console.log("Value", value);
     const userId = await getData(LocalDBItems.employeeDetails);
     const checkInDetails = await getData(LocalDBItems.CHECK_IN_OUT_DETAILS);
     let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
+  
     this.setState({ loading: true });
-    if (value == 'Forgot to Checkout') {
-      const date = await AsyncStorage.getItem("forcetime")
-      let formattedTime = moment().format("MM/DD/YYYY") + ' ' + date;
-      console.log('IfformattedTime*******', formattedTime)
-      let forceCheckoutTime = moment(formattedTime, "MM/DD/YYYY hh:mm:A").toDate();
-      console.log(forceCheckoutTime, "forceCheckoutTime");
+  
+    let forceCheckoutTime;
+    if (value === 'Forgot to Checkout') {
+      const date = await AsyncStorage.getItem("forcetime");
+      const formattedTime = moment().format("MM/DD/YYYY") + ' ' + date;
+      forceCheckoutTime = moment(formattedTime, "MM/DD/YYYY hh:mm:A").toDate();
+    } else {
+      const now = moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A");
+      const formattedTime = moment().format("MM/DD/YYYY") + ' ' + now;
+      forceCheckoutTime = moment(formattedTime, "MM/DD/YYYY hh:mm:A").toDate();
     }
-    else {
-      const date = moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A");
-      let formattedTime = moment().format("MM/DD/YYYY") + ' ' + date;
-      console.log('elseformattedTime*******', formattedTime)
-      let forceCheckoutTime = moment(formattedTime, "MM/DD/YYYY hh:mm:A").toDate();
-      console.log(forceCheckoutTime, "forceCheckoutTime");
-    }
-    console.log('-----205');
+  
+    console.log("forceCheckoutTime", forceCheckoutTime);
+  
     let params = {
       team_member_empid: this.checkInDataValue.empid,
       groupid: this.checkInDataValue.groupid,
-      check_out: this.forceCheckoutTime,
-      is_inrange: checkIsInRadius ? checkIsInRadius : false,
+      check_out: forceCheckoutTime,
+      is_inrange: checkIsInRadius || false,
       modifiedby: userId.full_name,
       checkout_tag_id: this.UUID,
       is_app_check_In: true,
@@ -561,64 +562,63 @@ getCurrentLocation = () => {
         street_number: this.currentLocationObj.street_number,
         route: this.currentLocationObj.route,
         locality: this.currentLocationObj.locality,
-        administrative_area_level_2: this.currentLocationObj
-          .administrative_area_level_2,
-        administrative_area_level_1: this.currentLocationObj
-          .administrative_area_level_1,
+        administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
+        administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
         postal_code: this.currentLocationObj.postal_code,
         country: this.currentLocationObj.country,
       },
     };
-    console.log("I AM here bitch in UUID", params)
+  
     await storeData(LocalDBItems.checkOutLocationInfo, this.currentLocationObj);
-
+  
     const requestObj = {
       endpoint: BaseUrl.API_BASE_URL + Endpoint.FORCE_TIMESHEET_CHECKOUT,
       type: "post",
       params: params,
     };
-    console.log("Am here u bitch")
+  
     const apiResponseData = await apiService(requestObj);
-    setTimeout(() => {
+  
+    this.setState({ loading: false });
+    console.log("API response", apiResponseData);
+  
+    if (apiResponseData.status === "200") {
+      if (isEndOfWork) {
+        this.timer_error = false;
+        this.isWorkEnded = true;
+        this.isCheckinForLocation = false;
+        await storeData(LocalDBItems.isEmployeeLocationTrack, false);
+        this.locationFetcher.removeLocationUpdate();
+      } else {
+        // ✅ Restart location tracking
+        await storeData(LocalDBItems.isLocationTrackingNeeded, true);
+        this.setState({ showLiveTrackingButton: true });
+        this.startTracking(); // Your existing function
+      }
+  
+      // Reset UI and state
+      clearInterval(this.timerCheckIn);
+      clearInterval(this.timerBreakIn);
+      clearInterval(this.showTimerForAutoCheckOut);
+      this.timerStopCounter = 0;
+      this.timerStopForBreakCounter = 0;
+  
       this.setState({
         loading: false,
+        breakInData: null,
+        checkInData: null,
+        isStarted: false,
+        isBreak: false,
+        stopWatchCounter: "00:00",
+        stopWatchCounterBreakIn: "00:00",
+        progressBarPercentage: 0,
+        showAlertPopup: false,
+        isCheckOutPopup: false,
       });
-      console.log("Api", apiResponseData)
-
-      if (apiResponseData.status === "200") {
-        if (isEndOfWork) {
-          this.timer_error = false;
-          this.isWorkEnded = true;
-          this.isCheckinForLocation = false;
-          storeData(LocalDBItems.isEmployeeLocationTrack, false);
-          storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInDetails)
-          this.locationFetcher.removeLocationUpdate();
-        } else {
-          this.startTracking(); //for check out
-        }
-        clearInterval(this.timerCheckIn);
-        clearInterval(this.timerBreakIn);
-        clearInterval(this.showTimerForAutoCheckOut);
-        this.timerStopCounter = 0;
-        this.timerStopForBreakCounter = 0;
-        this.setState({
-          loading: false,
-          breakInData: null,
-          checkInData: null,
-          isStarted: false,
-          isBreak: false,
-          stopWatchCounter: "00:00",
-          stopWatchCounterBreakIn: "00:00",
-          loading: false,
-          progressBarPercentage: 0,
-          showAlertPopup: false,
-          isCheckOutPopup: false,
-        });
-        const full_name = `${userId.full_name} Force checked Out successfully`;
-        Toast.show(full_name, Toast.LONG);
-      }
-
-    }, 1000);
+  
+      const full_name = `${userId.full_name} Force checked Out successfully`;
+      Toast.show(full_name, Toast.LONG);
+    }
   };
   /**
    * show popup and checkout modal

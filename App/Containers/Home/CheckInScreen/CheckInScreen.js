@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import {
   Platform,
@@ -525,35 +526,31 @@ renderCustomTabBar = (props) => {
     Toast.show(full_name, Toast.LONG);
   }
   /*For submitting the report of the Face regonossation issue */
-  face_report = async () => {
-    const employeDetails = await getData(LocalDBItems.employeeDetails);
-    let params = { orgID: employeDetails.org_id }
-    const requestObj = {
-      endpoint: BaseUrl.API_BASE_URL + Endpoint.GETALL_APPROVAL_DATA,
-      type: "patch",
-      params: params,
-    }
-    const apiResponseData = await apiService(requestObj);
-    console.log("apiResponseData:", apiResponseData);
-    const emp_role_id = employeDetails.role_id;
-    const section_id_data = apiResponseData.filter(item => item.section_id === '8a55082f-5185-4d28-9098-4f268cb47d51' && item.role_id === emp_role_id);
-    console.log("Section_data", section_id_data)
-    if (section_id_data.length == 0) {
-
-      Alert.alert('Access Denied', 'You are not allowed to do the Face force CheckIn. Please Contact IT team', [
-        {
-          text: 'OK',
-          onPress: () => this.props.navigation.goBack(),
-          style: 'cancel'
-        },]);
-    }
-    else {
-      console.log("Checin in the Second area");
-      this.GetAllTimesheetListByEmployeeID();
-      this.reason_face = "face Recogonisation Issue";
-    }
-
+face_report = async () => {
+  const employeDetails = await getData(LocalDBItems.employeeDetails);
+  let params = { orgID: employeDetails.org_id };
+  const requestObj = {
+    endpoint: BaseUrl.API_BASE_URL + Endpoint.GETALL_APPROVAL_DATA,
+    type: "patch",
+    params: params,
+  };
+  const apiResponseData = await apiService(requestObj);
+  const emp_role_id = employeDetails.role_id;
+  const section_id_data = apiResponseData.filter(item => item.section_id === '8a55082f-5185-4d28-9098-4f268cb47d51' && item.role_id === emp_role_id);
+  
+  if (section_id_data.length == 0) {
+    Alert.alert('Access Denied', 'You are not allowed to do the Face force CheckIn. Please Contact IT team', [
+      {
+        text: 'OK',
+        onPress: () => this.props.navigation.goBack(),
+        style: 'cancel'
+      },]);
+  } else {
+    console.log("Checkin in the Second area");
+    this.GetAllTimesheetListByEmployeeID();
+    this.reason_face = "Face Recognition Issue";
   }
+};
 
   /**
  * Show timer when face is detected
@@ -782,133 +779,225 @@ renderCustomTabBar = (props) => {
   };
 
 
-  handleSubmission = async () => {
+handleSubmission = async () => {
+  const employeeDetails = await getData(LocalDBItems.employeeDetails);
+  const full_name = `${employeeDetails.full_name} Reported the Face Error problem successfully`;
+  Toast.show(full_name, Toast.LONG);
+  await this.addTimesheetForceCheckIn();
+  await this.face_report();
+};
+
+takeErrorPicture = async (base64) => {
+  try {
+    let fileUri;
+
+    if (base64) {
+      // Convert base64 to a temp file URI for upload
+      const filePath = `${RNFS.CachesDirectoryPath}/error_face.jpeg`;
+      await RNFS.writeFile(filePath, base64, 'base64');
+      fileUri = filePath;
+    } else {
+      // Fallback: capture from camera if no base64 provided
+      const photo = await cameraRef.current.takePhoto({
+        qualityPrioritization: 'speed',
+        flash: 'off',
+        skipMetadata: true,
+      });
+      fileUri = Platform.OS === 'ios' ? photo.uri.replace('file://', '') : photo.uri;
+    }
+
+    console.log("Uploading error face image:", fileUri);
+
+    // Prepare FormData
+    const formData = new FormData();
+    formData.append('file', {
+      uri: fileUri,
+      name: 'error_face.jpeg',
+      type: 'image/jpeg',
+    });
+    formData.append('upload_preset', 'circleApp');
+    formData.append('cloud_name', 'enforce-solutions');
+
+    // Upload to Cloudinary
+    const cloudinaryResponse = await fetch(
+      'https://api.cloudinary.com/v1_1/enforce-solutions/image/upload',
+      {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    const cloudinaryData = await cloudinaryResponse.json();
+
+    // Prepare params
     const employeeDetails = await getData(LocalDBItems.employeeDetails);
-    const full_name = `${employeeDetails.full_name} Reported the Face Error problem successfully`;
-    Toast.show(full_name, Toast.LONG);
-    await this.addTimesheetForceCheckIn()
-    await this.face_report()
+    const params = {
+      org_id: employeeDetails.org_id,
+      eventName: "FaceReconization_CheckIn_Faliure",
+      emp_id: employeeDetails.id,
+      imgUrl: cloudinaryData.url,
+      emp_Name: employeeDetails.full_name,
+      createdDate: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+      modifiedDate: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+    };
 
-  }
+    // Send to your API
+    const requestObj = {
+      endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_FORCE_TIMESHEET_CHECKIN,
+      type: "post",
+      params: params,
+    };
+    console.log(requestObj);
+    
+    const apiResponseData = await apiService(requestObj);
+    
+    if (apiResponseData.status == "200") {
+      counter_face_data = 0;
+      this.Mobile_ID = apiResponseData.desc;
 
-  takeErrorPicture = async function () {
-    if (this.camera) {
-      let base64 = "";
-      await this.camera
-        .takePictureAsync({
-          base64: true,
-          quality: 0.5,
-        })
-        .then((data) => {
-          console.log("TakeErrorPicture", data.uri)
-          const formData = new FormData();
-          formData.append('file',
-            {
-              uri: data.uri,
-              name: 'newNAme.jpeg',
-              type: 'image/jpeg',
-            })
-          formData.append('upload_preset', 'circleApp')
-          formData.append("cloud_name", "enforce-solutions")
-          fetch("https://api.cloudinary.com/v1_1/enforce-solutions/image/upload", {
-            method: "post",
-            body: formData,
-            headers: {
-              'Accept': "application/json",
-              'Content-Type': 'multipart/form-data',
-            }
-          }).then(res => res.json()).
-            then(async data => {
-
-              const employeeDetails = await getData(LocalDBItems.employeeDetails);
-              const params = {
-                org_id: employeeDetails.org_id,
-                eventName: "FaceReconization_CheckIn_Faliure",
-                emp_id: employeeDetails.id,
-                imgUrl: data.url,
-                emp_Name: employeeDetails.full_name,
-                createdDate: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-                modifiedDate: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-              };
-              const requestObj = {
-                endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_FORCE_TIMESHEET_CHECKIN,
-                type: "post",
-                params: params,
-              };
-              console.log(requestObj);
-              const apiResponseData = await apiService(requestObj);
-              if (apiResponseData.status == "200") {
-                counter_face_data = 0;
-                this.Mobile_ID = (apiResponseData.desc);
-                if (this.timer != null) {
-                  clearInterval(this.timer);
-                }
-                this.setState({ showAlertIdNoFace: false, isVerifyFace: false });
-                // this.setState({ isVerifcationPopUp:true ,isReverification:true});
-                // console.log("Am done here", this.state.isReverification)
-                console.log("Success")
-                Alert.alert('Face Error Occured', 'We have failed to recoginize your face and click to submit the report ', [
-                  {
-                    text: 'Submit The report',
-                    onPress: () => this.handleSubmission(),
-                    style: 'cancel'
-                  },]);
-
-                this.showTimerWhenFaceDetected();
-              }
-              else {
-                console.log("Error")
-              }
-              console.log(params);
-            }).catch(err => {
-              console.log('err--->', err);
-              reject(err);
-            })
-
-          clearInterval(this.timer);
-        });
-      if (this.timer != null) {
+      if (this.timer) {
         clearInterval(this.timer);
       }
-    }
-  };
-
-
-
-
-
-verifyFace = async (base64) => {
-  const employeeDetails = await getData(LocalDBItems.employeeDetails);
-  try {
-    const filename = `${employeeDetails.first_name.toLowerCase()}.jpeg`;
-    const collection_id = `face-collection-${employeeDetails.first_name.toLowerCase()}`;
-    var faceVerifyResult = await searchFaceImages(base64, filename, collection_id);
-    
-    const faceResult = faceVerifyResult.FaceMatches;
-    
-    if (faceVerifyResult.statusCode === 400 || !faceResult?.length) {
-      // Face recognition failed - STAY on CheckInScreen
+      
       this.setState({ 
-        showAlertIdNoFace: true,
+        showAlertIdNoFace: false, 
         isVerifyFace: false 
       });
-      return false; // Prevent navigation
-    }
 
-    // If face matches, proceed with check-in
-    if (this.state.isForceCheckIn) {
-      await this.addTimesheetForceCheckIn();
+      Alert.alert(
+        'Face Error Occurred', 
+        'We failed to recognize your face. A report has been submitted.',
+        [{ text: 'OK', onPress: () => this.handleSubmission() }]
+      );
+
+      this.showTimerWhenFaceDetected();
     } else {
-      await this.addTimesheetCheckIn(); // This will handle HomeScreen navigation
+      console.log("API Error", apiResponseData);
+      Alert.alert('Error', 'Failed to submit error report');
     }
-    return true;
-
   } catch (err) {
-    this.setState({ isVerifyFace: false });
+    console.log('Error in takeErrorPicture:', err);
+    Alert.alert('Error', 'Failed to capture error picture');
+    if (this.timer) {
+      clearInterval(this.timer);
+    }
+  }
+};
+
+
+
+
+
+
+  verifyFace = async (base64) => {
+  const employeeDetails = await getData(LocalDBItems.employeeDetails);
+
+  try {
+    // 🚨 If max attempts reached, skip verification and go for force check-in
+    if (counter_face_data >= 2) {
+      console.log("Face Error - Max attempts reached. Going for Force Check-In...");
+      this.setState({ isVerifyFace: false });
+      
+      // Directly send the captured base64 image for force check-in
+      await this.takeErrorPicture(base64);
+
+      this.count = 0;
+      return false;
+    }
+
+    // 🔍 Process normal face verification
+    const filename = `${employeeDetails.first_name.toLowerCase()}.jpeg`;
+    const collection_id = `face-collection-${employeeDetails.first_name.toLowerCase()}`;
+    
+    const faceVerifyResult = await searchFaceImages(base64, filename, collection_id);
+    console.log(faceVerifyResult, "faceVerifyResult");
+    console.log("COUNTER FACE DATA:", counter_face_data);
+
+    // Handle API errors first (timeout or 400)
+    if (faceVerifyResult.errorType === 'Sandbox.Timedout' || faceVerifyResult.statusCode === 400) {
+      this.count += 1;
+      if (this.count >= 2) {
+        this.setState({
+          showAlertIdNoFace: true,
+          isVerifyFace: false,
+          alertMessage: "Face verification timed out. Please try again."
+        });
+        clearInterval(this.timer);
+      } else {
+         this.takePicture();
+      }
+      return false;
+    }
+
+    // ✅ Process successful face recognition
+    const faceResult = faceVerifyResult.FaceMatches;
+    if (faceResult?.length > 0 && faceResult[0].Face?.ExternalImageId) {
+      if (faceResult[0].Face.ExternalImageId.includes(employeeDetails.first_name.toLowerCase())) {
+        clearInterval(this.timer);
+        
+        if (this.state.isTeamClicked) {
+          this.employeeDetails.isFaceVerified = true;
+          if (this.modalizeRef.current) {
+            this.ModalOpen = true;
+            this.modalizeRef.current.open();
+          }
+        } else {
+          this.state.isForceCheckIn 
+            ? this.addTimesheetForceCheckIn() 
+            : this.addTimesheetCheckIn();
+        }
+        return true;
+      } else {
+        return this.handleFailedVerification("Face not recognized. Please try again.");
+      }
+    } else {
+      return this.handleFailedVerification("No matching face found. Please try again.");
+    }
+  } catch (err) {
+    console.error("Error in verifyFace:", err);
+    this.setState({
+      showAlertIdNoFace: true,
+      isVerifyFace: false,
+      alertMessage: "An error occurred. Please try again."
+    });
+    clearInterval(this.timer);
     return false;
   }
 };
 
+
+// Helper function for failed verification cases
+handleFailedVerification = (message) => {
+  counter_face_data += 1; // make sure we're tracking attempts globally
+  this.count += 1;
+
+  // Always show popup for failed attempts
+  this.setState({
+    showAlertIdNoFace: true,
+    isVerifyFace: false,
+    alertMessage: message
+  });
+
+  // Open your custom popup modal
+  if (this.modalizeRef.current && !this.ModalOpen) {
+    this.ModalOpen = true;
+    this.modalizeRef.current.open();
+  }
+
+  // If max attempts reached, stop retry
+  if (this.count >= 2) {
+    return false;
+  }
+
+  // Retry after popup is shown
+  setTimeout(() => {
+    this.takePicture();
+  }, 2000); // wait 2 seconds before retry
+  return false;
+};
 
 
   /**
@@ -1337,6 +1426,8 @@ addTimesheetCheckIn = async () => {
     const apiResponseData = await apiService(requestObj);
     console.log("responseData", apiResponseData)
   };
+
+  
   handleIndexChange = (index) => {
     switch (index) {
       case CategortTeam.DEPARTMENT_ID:
@@ -1601,100 +1692,95 @@ addTimesheetCheckIn = async () => {
     }
   };
 
-  GetAllTimesheetListByEmployeeID = async () => {
-    const employeDetails = await getData(LocalDBItems.employeeDetails);
-    const locationtracking = await getData(LocalDBItems.isEmployeeLocationTrack)
-    let params = { orgID: employeDetails.org_id }
-    const requestObj = {
-      endpoint: BaseUrl.API_BASE_URL + Endpoint.GETALL_APPROVAL_DATA,
-      type: "patch",
-      params: params,
-    }
-    const apiResponseData = await apiService(requestObj);
-    const emp_role_id = employeDetails.role_id;
-    const section_id_data = apiResponseData.filter(item => item.section_id === '8a55082f-5185-4d28-9098-4f268cb47d51' && item.role_id === emp_role_id);
-    // approver1_id = section_id_data[0].approver1_roleId;
-    // approver2_id = section_id_data[0].approver2_roleId;
-    // console.log("approval data" , approver1_id,approver2_id)
+GetAllTimesheetListByEmployeeID = async () => {
+  const employeDetails = await getData(LocalDBItems.employeeDetails);
+  const locationtracking = await getData(LocalDBItems.isEmployeeLocationTrack);
+  let params = { orgID: employeDetails.org_id };
+  const requestObj = {
+    endpoint: BaseUrl.API_BASE_URL + Endpoint.GETALL_APPROVAL_DATA,
+    type: "patch",
+    params: params,
+  };
+  const apiResponseData = await apiService(requestObj);
+  const emp_role_id = employeDetails.role_id;
+  const section_id_data = apiResponseData.filter(item => item.section_id === '8a55082f-5185-4d28-9098-4f268cb47d51' && item.role_id === emp_role_id);
 
-    let params2 = {
-      id: employeDetails.id
-    };
-    const requestObj2 = {
-      endpoint: BaseUrl.API_BASE_URL + Endpoint.GET_ALL_TIMESHEET_LISTBY_EMPLOYEEID,
-      type: "post",
-      params: params2,
-    }
-    const apiResponseData2 = await apiService(requestObj2);
-    console.log("chod", apiResponseData2)
+  let params2 = {
+    id: employeDetails.id
+  };
+  const requestObj2 = {
+    endpoint: BaseUrl.API_BASE_URL + Endpoint.GET_ALL_TIMESHEET_LISTBY_EMPLOYEEID,
+    type: "post",
+    params: params2,
+  };
+  const apiResponseData2 = await apiService(requestObj2);
 
-    const lastest_time = apiResponseData2[0]["timesheetDataModels"][0]["id"];
-    console.log("Lastest_time", lastest_time);
-    console.log("Kallan ivde Und", this.Mobile_ID);
+  const lastest_time = apiResponseData2[0]["timesheetDataModels"][0]["id"];
 
-    let params3 = {
-      org_id: employeDetails.org_id,
-      refrence_id: this.Mobile_ID,
-      type: "checkin",
-      empid: employeDetails.id,
-      timesheet_id: lastest_time,
-      ondate: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-      check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-      checkin_lat: this.currentLocationObj.latitude,
-      checkin_lang: this.currentLocationObj.longitude,
-      check_out: null,
-      checkout_lat: null,
-      checkout_lang: null,
-      levelone_roleId: section_id_data[0].approver1_roleId,
-      isapproved_levelone: false,
-      leveltwo_roleId: section_id_data[0].approver2_roleId,
-      isapproved_leveltwo: false,
-      reason_name: this.reason_location + this.reason_face,
-      status: "pending",
-      created_date: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-      createdby: employeDetails.id,
-      modified_date: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-      modifiedby: employeDetails.id,
-      is_deleted: false,
-      is_app_check_In: true
-    }
-    console.log("Dadycool", params3)
-    const requestObj3 = {
-      endpoint: BaseUrl.API_BASE_URL + Endpoint.FORCE_CHECKIN_REQUEST,
-      type: "post",
-      params: params3,
-    }
-    const apiResponseData3 = await apiService(requestObj3);
-    console.log(apiResponseData3);
-    this.setState({ isForcecheckout: true })
-    const checkInCheckOutData = {
-      checkin_out_project: null,
-      checkin_out_jobType: null
-    }
-    const checkinInfo = {
-      isOfficeChecin: this.state.isOffice,
-      isProjectCheckin: this.isProject,
-    };
-    storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData)
-    storeData(LocalDBItems.checkInInfo, checkinInfo);
-    if (locationtracking == false) {
-      console.log(" Am stuck here help me");
-      storeData(LocalDBItems.isEmployeeLocationTrack, false);
-      this.locationFetcher.removeLocationUpdate();
-    } else {
-      console.log(" Am stuck  me");
-      storeData(LocalDBItems.isEmployeeLocationTrack, true); //
-    }
-
-    this.onGoBackToPrevious();
-    this.props.navigation.goBack();
-    this.props.route.params.onGoBack();
-
-    const employeeDetails = await getData(LocalDBItems.employeeDetails);
-    const full_name = `${employeeDetails.full_name} Force checked in successfully`;
-    Toast.show(full_name, Toast.LONG);
-
+  let params3 = {
+    org_id: employeDetails.org_id,
+    refrence_id: this.Mobile_ID,
+    type: "checkin",
+    empid: employeDetails.id,
+    timesheet_id: lastest_time,
+    ondate: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+    check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+    checkin_lat: this.currentLocationObj.latitude,
+    checkin_lang: this.currentLocationObj.longitude,
+    check_out: null,
+    checkout_lat: null,
+    checkout_lang: null,
+    levelone_roleId: section_id_data[0].approver1_roleId,
+    isapproved_levelone: false,
+    leveltwo_roleId: section_id_data[0].approver2_roleId,
+    isapproved_leveltwo: false,
+    reason_name: this.reason_location + this.reason_face,
+    status: "pending",
+    created_date: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+    createdby: employeDetails.id,
+    modified_date: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+    modifiedby: employeDetails.id,
+    is_deleted: false,
+    is_app_check_In: true
+  };
+  
+  const requestObj3 = {
+    endpoint: BaseUrl.API_BASE_URL + Endpoint.FORCE_CHECKIN_REQUEST,
+    type: "post",
+    params: params3,
+  };
+  const apiResponseData3 = await apiService(requestObj3);
+  
+  this.setState({ isForcecheckout: true });
+  const checkInCheckOutData = {
+    checkin_out_project: null,
+    checkin_out_jobType: null
+  };
+  const checkinInfo = {
+    isOfficeChecin: this.state.isOffice,
+    isProjectCheckin: this.isProject,
+  };
+  
+  await storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData);
+  await storeData(LocalDBItems.checkInInfo, checkinInfo);
+  
+  if (!locationtracking) {
+    await storeData(LocalDBItems.isEmployeeLocationTrack, false);
+    this.locationFetcher.removeLocationUpdate();
+  } else {
+    await storeData(LocalDBItems.isEmployeeLocationTrack, true);
   }
+
+  this.props.navigation.navigate('HomeScreen', {
+    refresh: true,
+    checkInLocation: this.currentLocationObj,
+    checkInTime: params3.check_in,
+    isNewCheckIn: true
+  });
+
+  const full_name = `${employeDetails.full_name} Force checked in successfully`;
+  Toast.show(full_name, Toast.LONG);
+};
 
 
 
@@ -2651,31 +2737,20 @@ addTimesheetCheckIn = async () => {
     );
   }
 
-handlePhotoTaken = async (base64Photo) => {
-  addLog("Photo captured successfully");
-  try {
-    let verificationSuccess = false;
-    
-    if (this.state.isGroupVerifyClicked) {
-      addLog("Processing group verification");
-      await this.verifyGroupCheckin(base64Photo);
-      verificationSuccess = true;
-    } else {
-      addLog("Processing individual verification");
-      verificationSuccess = await this.verifyFace(base64Photo);
+  handlePhotoTaken = async (base64Photo) => {
+    addLog("Photo captured successfully");
+    try {
+      if (this.state.isGroupVerifyClicked) {
+        addLog("Processing group verification");
+        await this.verifyGroupCheckin(base64Photo);
+      } else {
+        addLog("Processing individual verification");
+        await this.verifyFace(base64Photo);
+      }
+    } catch (error) {
+      addLog(`Photo processing failed: ${error}`);
     }
-
-    // Return verification result to camera component
-    return verificationSuccess;
-    
-  } catch (error) {
-    addLog(`Photo processing failed: ${error}`);
-    return false;
-  } finally {
-    // Ensure loader is hidden when done
-    this.setState({ showCameraLoader: false });
-  }
-};
+  };
 
 
   // Face detection
@@ -3348,7 +3423,7 @@ getLoctionObj = async (locationObj) => {
                   colors={["#fe717f", "#fa8576", "#f6976e"]}
                   style={[styles.startButton, { opacity: 0.5 }]}
                 >
-                  <Text style={styles.startText}>Start</Text>
+                  <Text style={styles.startText}> Start </Text>
                 </LinearGradient>
               </View>
             ) : (
@@ -3507,10 +3582,6 @@ getLoctionObj = async (locationObj) => {
                     </View>
 
                   </View>
-
-
-
-
                 ) : null
             }
 

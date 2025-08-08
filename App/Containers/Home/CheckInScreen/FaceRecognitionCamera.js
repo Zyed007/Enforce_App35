@@ -1,5 +1,5 @@
 // FaceRecognitionCamera.js
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
 import {
   Camera,
@@ -11,7 +11,7 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import Loader from "../../../Components/Loader";
 import { useNavigation } from '@react-navigation/native';
 
-const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss, navigation }) => {
+const FaceRecognitionCamera = forwardRef(({ onPhotoTaken, onDismiss, navigation, onTakeErrorPicture }, ref) => {
   const cameraRef = useRef(null);
   const [isActive, setIsActive] = useState(true);
   const [hasPermission, setHasPermission] = useState(false);
@@ -19,7 +19,8 @@ const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss, navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const [verificationComplete, setVerificationComplete] = useState(false);
-
+  const [isErrorCapture, setIsErrorCapture] = useState(false);
+  
   const device = useCameraDevice('front');
 
   // Request camera permissions
@@ -31,9 +32,9 @@ const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss, navigation }) => {
     requestPermissions();
   }, []);
 
-  // Auto capture after 5 seconds
+  // Auto capture after 5 seconds (only for normal verification)
   useEffect(() => {
-    if (!hasPermission || !device || verificationComplete) return;
+    if (!hasPermission || !device || verificationComplete || isErrorCapture) return;
 
     const timer = setInterval(() => {
       setCountdown(prev => {
@@ -47,35 +48,45 @@ const FaceRecognitionCamera = ({ onPhotoTaken, onDismiss, navigation }) => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [hasPermission, device, verificationComplete]);
+  }, [hasPermission, device, verificationComplete, isErrorCapture]);
 
-const capturePhoto = async () => {
-  try {
-    if (!cameraRef.current) return;
+  const errorPicture= async () => {
     
-    setIsLoading(true);
-    setIsActive(false);
-
-    const photo = await cameraRef.current.takePhoto({
-      qualityPrioritization: 'speed',
-      flash: 'off',
-      skipMetadata: true,
-    });
-
-    const base64 = await RNFS.readFile(photo.path, 'base64');
-    setCapturedPhoto(`data:image/jpeg;base64,${base64}`);
-    
-    // Pass navigation control back to CheckInScreen
-    await onPhotoTaken(base64); 
-    
-  } catch (error) {
-    console.error('Capture error:', error);
-    Alert.alert('Error', 'Failed to capture photo');
-    navigation.goBack(); // Go back to CheckInScreen on error
-  } finally {
-    setIsLoading(false);
   }
-};
+
+  const capturePhoto = async () => {
+    try {
+      if (!cameraRef.current) return;
+      
+      setIsLoading(true);
+      setIsActive(false);
+
+      const photo = await cameraRef.current.takePhoto({
+        qualityPrioritization: 'speed',
+        flash: 'off',
+        skipMetadata: true,
+      });
+
+      const base64 = await RNFS.readFile(photo.path, 'base64');
+      setCapturedPhoto(`data:image/jpeg;base64,${base64}`);
+      
+      // Pass the photo back to parent component
+      await onPhotoTaken(base64);
+      
+    } catch (error) {
+      console.error('Capture error:', error);
+      Alert.alert('Error', 'Failed to capture photo');
+      navigation.goBack();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    capturePhoto
+  }));
 
   if (!hasPermission) {
     return (
@@ -115,6 +126,7 @@ const capturePhoto = async () => {
         style={styles.backButton} 
         onPress={() => {
           setIsActive(false);
+          onDismiss();
           navigation.goBack();
         }}
       >
@@ -124,7 +136,7 @@ const capturePhoto = async () => {
       <View style={styles.overlay}>
         <View style={styles.faceGuide} />
         
-        {!capturedPhoto && (
+        {!capturedPhoto && !isErrorCapture && (
           <View style={styles.countdownContainer}>
             <Text style={styles.countdownText}>Capturing in {countdown} seconds</Text>
           </View>
@@ -134,7 +146,7 @@ const capturePhoto = async () => {
       <Loader loading={isLoading} />
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -164,7 +176,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 20,
   },
-   backButton: {
+  backButton: {
     position: 'absolute',
     top: 60,
     left: 30,
