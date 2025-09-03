@@ -141,6 +141,11 @@ export default class HomeScreen extends React.Component {
       (this.checkInDataValue = null);
     this.isCheckinAdmin = null;
   }
+
+   handleAppStateChange = (nextAppState) => {
+    this.setState({ appState: nextAppState });
+
+  };
   /**
    * Get employee details from the store
    * Get last check in details by employee ID
@@ -178,7 +183,12 @@ export default class HomeScreen extends React.Component {
   }
   componentWillUnmount() {
     // Remove app state listener
-    AppState.removeEventListener('change', this.handleAppStateChange);
+    if (this.appStateSubscription) {
+    this.appStateSubscription.remove();
+  }
+  // if (this._unsubscribe) {
+  //   this._unsubscribe();
+  // }
     
     clearInterval(this.timerCheckIn);
     clearInterval(this.timerBreakIn);
@@ -1729,12 +1739,13 @@ navigateToAuthScreen = async () => {
 
   modalLogout = () => {
   console.log("Starting logout process..."); // Debug
-  Geolocation.stopObserving();
+  //Geolocation.stopObserving();
   this.setState({ showAlertPopup: false, isCheckOutPopup: false }, () => {
     console.log("State updated, navigating to Auth..."); // Debug
     this.navigateToAuthScreen();
   });
-};
+  
+   };
   resetTracking = async () => {
     await storeData(LocalDBItems.isLocationTrackingNeeded, false);
     await storeData(LocalDBItems.locationArray, []);

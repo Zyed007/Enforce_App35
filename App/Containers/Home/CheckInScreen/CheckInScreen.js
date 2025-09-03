@@ -101,7 +101,7 @@ export default class CheckInScreen extends React.Component {
   constructor(props) {
     super(props);
     this.dismissAndGoBack = this.dismissAndGoBack.bind(this);
-    
+
 
     const initialLocation = props.route.params?.locationDetails || {
       formatted_address: '',
@@ -216,185 +216,185 @@ export default class CheckInScreen extends React.Component {
     this.isAllowtocheckin = false;
   }
   // Modify componentDidMount to properly handle iOS permissions
-async componentDidMount() {
-  try {
-    counter_face_data = 0;
+  async componentDidMount() {
+    try {
+      counter_face_data = 0;
 
-    // Initialize with default location values
-    this.currentLocationObj = {
-      formatted_address: '',
-      latitude: 0,
-      longitude: 0,
-      street_number: '',
-      route: '',
-      locality: '',
-      administrative_area_level_2: '',
-      administrative_area_level_1: '',
-      postal_code: '',
-      country: ''
-    };
-
-    // 1. First try to use passed location data if available
-    const { cordinateObj, locationDetails } = this.props.route.params || {};
-    if (cordinateObj && locationDetails) {
-      console.log('[Location] Using passed location:', {
-        lat: cordinateObj.latitude,
-        lng: cordinateObj.longitude,
-        address: locationDetails.formatted_address
-      });
-
-      this.cordinateObj = {
-        latitude: cordinateObj.latitude,
-        longitude: cordinateObj.longitude
-      };
-
+      // Initialize with default location values
       this.currentLocationObj = {
-        ...locationDetails, // Use all passed location details
-        latitude: cordinateObj.latitude,
-        longitude: cordinateObj.longitude
+        formatted_address: '',
+        latitude: 0,
+        longitude: 0,
+        street_number: '',
+        route: '',
+        locality: '',
+        administrative_area_level_2: '',
+        administrative_area_level_1: '',
+        postal_code: '',
+        country: ''
       };
 
-      this.setState({
-        locationName: locationDetails.formatted_address || 'Current Location',
-        isInitialLoad: false
-      });
-    }
-
-    // 2. Initialize geocoder early
-    console.log('[Init] Initializing geocoder...');
-    await this.geoCoder.initiaLizeGeoCoder();
-
-    // 3. If no passed location or on iOS, get fresh location
-    if (!cordinateObj || Platform.OS === 'ios') {
-      try {
-        console.log('[Location] Requesting fresh location...');
-        const status = await check(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-        
-        if (status !== RESULTS.GRANTED) {
-          const newStatus = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-          if (newStatus !== RESULTS.GRANTED) {
-            throw new Error('Location permission denied');
-          }
-        }
-
-        const position = await new Promise((resolve, reject) => {
-          Geolocation.getCurrentPosition(
-            resolve,
-            reject,
-            { 
-              enableHighAccuracy: true, 
-              timeout: 10000,
-              maximumAge: 0 
-            }
-          );
+      // 1. First try to use passed location data if available
+      const { cordinateObj, locationDetails } = this.props.route.params || {};
+      if (cordinateObj && locationDetails) {
+        console.log('[Location] Using passed location:', {
+          lat: cordinateObj.latitude,
+          lng: cordinateObj.longitude,
+          address: locationDetails.formatted_address
         });
 
-        console.log('[Location] Got fresh coordinates:', position.coords);
         this.cordinateObj = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
+          latitude: cordinateObj.latitude,
+          longitude: cordinateObj.longitude
         };
 
-        // Get full address details
-        const freshLocation = await this.geoCoder.getPlaceFromCordinate(
-          position.coords.latitude,
-          position.coords.longitude
-        );
+        this.currentLocationObj = {
+          ...locationDetails, // Use all passed location details
+          latitude: cordinateObj.latitude,
+          longitude: cordinateObj.longitude
+        };
 
-        if (freshLocation) {
-          console.log('[Location] Fresh location details:', freshLocation);
-          this.currentLocationObj = freshLocation;
-          this.setState({
-            locationName: freshLocation.formatted_address,
-            isInitialLoad: false
+        this.setState({
+          locationName: locationDetails.formatted_address || 'Current Location',
+          isInitialLoad: false
+        });
+      }
+
+      // 2. Initialize geocoder early
+      console.log('[Init] Initializing geocoder...');
+      await this.geoCoder.initiaLizeGeoCoder();
+
+      // 3. If no passed location or on iOS, get fresh location
+      if (!cordinateObj || Platform.OS === 'ios') {
+        try {
+          console.log('[Location] Requesting fresh location...');
+          const status = await check(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
+
+          if (status !== RESULTS.GRANTED) {
+            const newStatus = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
+            if (newStatus !== RESULTS.GRANTED) {
+              throw new Error('Location permission denied');
+            }
+          }
+
+          const position = await new Promise((resolve, reject) => {
+            Geolocation.getCurrentPosition(
+              resolve,
+              reject,
+              {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+              }
+            );
           });
-        }
-      } catch (error) {
-        console.warn('[Location] Error getting fresh location:', error);
-        if (!cordinateObj) {
-          Alert.alert(
-            'Location Error', 
-            'Could not determine your current location'
+
+          console.log('[Location] Got fresh coordinates:', position.coords);
+          this.cordinateObj = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+
+          // Get full address details
+          const freshLocation = await this.geoCoder.getPlaceFromCordinate(
+            position.coords.latitude,
+            position.coords.longitude
           );
+
+          if (freshLocation) {
+            console.log('[Location] Fresh location details:', freshLocation);
+            this.currentLocationObj = freshLocation;
+            this.setState({
+              locationName: freshLocation.formatted_address,
+              isInitialLoad: false
+            });
+          }
+        } catch (error) {
+          console.warn('[Location] Error getting fresh location:', error);
+          if (!cordinateObj) {
+            Alert.alert(
+              'Location Error',
+              'Could not determine your current location'
+            );
+          }
         }
       }
-    }
 
-    // 4. Load other essential data
-    console.log('[Init] Loading employee details...');
-    const empDetails = await this.getEmployeeDetails();
-    if (!empDetails) {
-      throw new Error('Failed to load employee details');
-    }
-
-    console.log('[Init] Fetching project data...');
-    await this.fetchAllProjectByOrgID();
-
-    console.log('[Init] Getting UUID...');
-    this.UUID = await getUUID();
-
-    console.log('[Init] Starting error timer...');
-    this.errortimer();
-
-    // 5. Set up navigation listener
-    this._unsubscribe = this.props.navigation.addListener("blur", () => {
-      console.log('[Cleanup] Removing location listeners...');
-      if (this.locationFetcher) {
-        this.locationFetcher.removeListners();
+      // 4. Load other essential data
+      console.log('[Init] Loading employee details...');
+      const empDetails = await this.getEmployeeDetails();
+      if (!empDetails) {
+        throw new Error('Failed to load employee details');
       }
-      if (this.locationTimeout) {
-        clearTimeout(this.locationTimeout);
-      }
-    });
 
-    console.log('[Init] CheckInScreen mounted successfully');
-    console.log('[Init] Final location state:', {
-      coords: this.cordinateObj,
-      address: this.currentLocationObj.formatted_address
-    });
+      console.log('[Init] Fetching project data...');
+      await this.fetchAllProjectByOrgID();
 
-  } catch (error) {
-    console.error('[Init] Initialization failed:', error);
-    this.setState({ isLoading: false });
-    Alert.alert(
-      'Error',
-      'Failed to initialize check-in. Please try again.'
-    );
-    this.props.navigation.goBack();
+      console.log('[Init] Getting UUID...');
+      this.UUID = await getUUID();
+
+      console.log('[Init] Starting error timer...');
+      this.errortimer();
+
+      // 5. Set up navigation listener
+      this._unsubscribe = this.props.navigation.addListener("blur", () => {
+        console.log('[Cleanup] Removing location listeners...');
+        if (this.locationFetcher) {
+          this.locationFetcher.removeListners();
+        }
+        if (this.locationTimeout) {
+          clearTimeout(this.locationTimeout);
+        }
+      });
+
+      console.log('[Init] CheckInScreen mounted successfully');
+      console.log('[Init] Final location state:', {
+        coords: this.cordinateObj,
+        address: this.currentLocationObj.formatted_address
+      });
+
+    } catch (error) {
+      console.error('[Init] Initialization failed:', error);
+      this.setState({ isLoading: false });
+      Alert.alert(
+        'Error',
+        'Failed to initialize check-in. Please try again.'
+      );
+      this.props.navigation.goBack();
+    }
   }
-}
 
 
-onTabChange = (routeName) => {
-  let tabIndex = 2; // default is Place
+  onTabChange = (routeName) => {
+    let tabIndex = 2; // default is Place
 
-  if (routeName === 'Job') tabIndex = 0;
-  else if (routeName === 'Case') tabIndex = 1;
-  else if (routeName === 'Place') tabIndex = 2;
+    if (routeName === 'Job') tabIndex = 0;
+    else if (routeName === 'Case') tabIndex = 1;
+    else if (routeName === 'Place') tabIndex = 2;
 
-  this.setState({ selectedTab: tabIndex });
-};
+    this.setState({ selectedTab: tabIndex });
+  };
 
-renderCustomTabBar = (props) => {
-  return (
-    <LinearGradient
-      start={{ x: 0.5, y: 1.0 }}
-      end={{ x: 0.0, y: 0.25 }}
-      colors={this.getNavigationColor()}
-    >
-      <MaterialTopTabBar
-        {...props}
-        style={{
-          backgroundColor: 'transparent',
-        }}
-        activeTintColor="black"
-        inactiveTintColor="gray"
-        labelStyle={{ fontSize: 20, fontWeight: 'bold' }}
-        indicatorStyle={{ backgroundColor: 'black' }}
-      />
-    </LinearGradient>
-  );
-};
+  renderCustomTabBar = (props) => {
+    return (
+      <LinearGradient
+        start={{ x: 0.5, y: 1.0 }}
+        end={{ x: 0.0, y: 0.25 }}
+        colors={this.getNavigationColor()}
+      >
+        <MaterialTopTabBar
+          {...props}
+          style={{
+            backgroundColor: 'transparent',
+          }}
+          activeTintColor="black"
+          inactiveTintColor="gray"
+          labelStyle={{ fontSize: 20, fontWeight: 'bold' }}
+          indicatorStyle={{ backgroundColor: 'black' }}
+        />
+      </LinearGradient>
+    );
+  };
   // Helper method to validate location
   hasValidLocation = () => {
     return this.currentLocationObj.latitude !== 0 &&
@@ -423,6 +423,7 @@ renderCustomTabBar = (props) => {
     if (this.timer != null) {
       clearInterval(this.timer);
     }
+    
   }
 
   /**
@@ -526,31 +527,31 @@ renderCustomTabBar = (props) => {
     Toast.show(full_name, Toast.LONG);
   }
   /*For submitting the report of the Face regonossation issue */
-face_report = async () => {
-  const employeDetails = await getData(LocalDBItems.employeeDetails);
-  let params = { orgID: employeDetails.org_id };
-  const requestObj = {
-    endpoint: BaseUrl.API_BASE_URL + Endpoint.GETALL_APPROVAL_DATA,
-    type: "patch",
-    params: params,
+  face_report = async () => {
+    const employeDetails = await getData(LocalDBItems.employeeDetails);
+    let params = { orgID: employeDetails.org_id };
+    const requestObj = {
+      endpoint: BaseUrl.API_BASE_URL + Endpoint.GETALL_APPROVAL_DATA,
+      type: "patch",
+      params: params,
+    };
+    const apiResponseData = await apiService(requestObj);
+    const emp_role_id = employeDetails.role_id;
+    const section_id_data = apiResponseData.filter(item => item.section_id === '8a55082f-5185-4d28-9098-4f268cb47d51' && item.role_id === emp_role_id);
+
+    if (section_id_data.length == 0) {
+      Alert.alert('Access Denied', 'You are not allowed to do the Face force CheckIn. Please Contact IT team', [
+        {
+          text: 'OK',
+          onPress: () => this.props.navigation.goBack(),
+          style: 'cancel'
+        },]);
+    } else {
+      console.log("Checkin in the Second area");
+      this.GetAllTimesheetListByEmployeeID();
+      this.reason_face = "Face Recognition Issue";
+    }
   };
-  const apiResponseData = await apiService(requestObj);
-  const emp_role_id = employeDetails.role_id;
-  const section_id_data = apiResponseData.filter(item => item.section_id === '8a55082f-5185-4d28-9098-4f268cb47d51' && item.role_id === emp_role_id);
-  
-  if (section_id_data.length == 0) {
-    Alert.alert('Access Denied', 'You are not allowed to do the Face force CheckIn. Please Contact IT team', [
-      {
-        text: 'OK',
-        onPress: () => this.props.navigation.goBack(),
-        style: 'cancel'
-      },]);
-  } else {
-    console.log("Checkin in the Second area");
-    this.GetAllTimesheetListByEmployeeID();
-    this.reason_face = "Face Recognition Issue";
-  }
-};
 
   /**
  * Show timer when face is detected
@@ -725,10 +726,40 @@ face_report = async () => {
     }, 20000)
   }
 
-  flushtimer = () => {
-    addLog("Start button clicked - Beginning verification flow");
-    this.verifyFaceRekcongition();
-  };
+flushtimer = () => {
+  addLog("Start button clicked - Bypassing face verification");
+  
+  // Check location validity
+  if (!this.hasValidLocation()) {
+    addLog("Location validation failed");
+    Alert.alert('Location Error', 'Valid location is required');
+    return;
+  }
+
+  // If it's office check-in, verify radius
+  if (this.state.isOffice) {
+    this.locationFetcher.isLocationInRadius().then(isInRadius => {
+      if (!isInRadius) {
+        Alert.alert('Location Mismatch', 'You must be within office premises');
+        return;
+      }
+      this.proceedWithCheckIn();
+    }).catch(error => {
+      console.error('Radius check failed:', error);
+      Alert.alert('Error', 'Failed to verify location');
+    });
+  } else {
+    this.proceedWithCheckIn();
+  }
+};
+
+proceedWithCheckIn = () => {
+  if (this.state.isForceCheckIn) {
+    this.addTimesheetForceCheckIn();
+  } else {
+    this.addTimesheetCheckIn();
+  }
+};
 
 
 
@@ -779,113 +810,113 @@ face_report = async () => {
   };
 
 
-handleSubmission = async () => {
-  const employeeDetails = await getData(LocalDBItems.employeeDetails);
-  const full_name = `${employeeDetails.full_name} Reported the Face Error problem successfully`;
-  Toast.show(full_name, Toast.LONG);
-  await this.addTimesheetForceCheckIn();
-  await this.face_report();
-};
-
-takeErrorPicture = async (base64) => {
-  try {
-    let fileUri;
-
-    if (base64) {
-      // Convert base64 to a temp file URI for upload
-      const filePath = `${RNFS.CachesDirectoryPath}/error_face.jpeg`;
-      await RNFS.writeFile(filePath, base64, 'base64');
-      fileUri = filePath;
-    } else {
-      // Fallback: capture from camera if no base64 provided
-      const photo = await cameraRef.current.takePhoto({
-        qualityPrioritization: 'speed',
-        flash: 'off',
-        skipMetadata: true,
-      });
-      fileUri = Platform.OS === 'ios' ? photo.uri.replace('file://', '') : photo.uri;
-    }
-
-    console.log("Uploading error face image:", fileUri);
-
-    // Prepare FormData
-    const formData = new FormData();
-    formData.append('file', {
-      uri: fileUri,
-      name: 'error_face.jpeg',
-      type: 'image/jpeg',
-    });
-    formData.append('upload_preset', 'circleApp');
-    formData.append('cloud_name', 'enforce-solutions');
-
-    // Upload to Cloudinary
-    const cloudinaryResponse = await fetch(
-      'https://api.cloudinary.com/v1_1/enforce-solutions/image/upload',
-      {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
-    const cloudinaryData = await cloudinaryResponse.json();
-
-    // Prepare params
+  handleSubmission = async () => {
     const employeeDetails = await getData(LocalDBItems.employeeDetails);
-    const params = {
-      org_id: employeeDetails.org_id,
-      eventName: "FaceReconization_CheckIn_Faliure",
-      emp_id: employeeDetails.id,
-      imgUrl: cloudinaryData.url,
-      emp_Name: employeeDetails.full_name,
-      createdDate: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-      modifiedDate: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-    };
+    const full_name = `${employeeDetails.full_name} Reported the Face Error problem successfully`;
+    Toast.show(full_name, Toast.LONG);
+    await this.addTimesheetForceCheckIn();
+    await this.face_report();
+  };
 
-    // Send to your API
-    const requestObj = {
-      endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_FORCE_TIMESHEET_CHECKIN,
-      type: "post",
-      params: params,
-    };
-    console.log(requestObj);
-    
-    const apiResponseData = await apiService(requestObj);
-    
-    if (apiResponseData.status == "200") {
-      counter_face_data = 0;
-      this.Mobile_ID = apiResponseData.desc;
+  takeErrorPicture = async (base64) => {
+    try {
+      let fileUri;
 
+      if (base64) {
+        // Convert base64 to a temp file URI for upload
+        const filePath = `${RNFS.CachesDirectoryPath}/error_face.jpeg`;
+        await RNFS.writeFile(filePath, base64, 'base64');
+        fileUri = filePath;
+      } else {
+        // Fallback: capture from camera if no base64 provided
+        const photo = await cameraRef.current.takePhoto({
+          qualityPrioritization: 'speed',
+          flash: 'off',
+          skipMetadata: true,
+        });
+        fileUri = Platform.OS === 'ios' ? photo.uri.replace('file://', '') : photo.uri;
+      }
+
+      console.log("Uploading error face image:", fileUri);
+
+      // Prepare FormData
+      const formData = new FormData();
+      formData.append('file', {
+        uri: fileUri,
+        name: 'error_face.jpeg',
+        type: 'image/jpeg',
+      });
+      formData.append('upload_preset', 'circleApp');
+      formData.append('cloud_name', 'enforce-solutions');
+
+      // Upload to Cloudinary
+      const cloudinaryResponse = await fetch(
+        'https://api.cloudinary.com/v1_1/enforce-solutions/image/upload',
+        {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+      const cloudinaryData = await cloudinaryResponse.json();
+
+      // Prepare params
+      const employeeDetails = await getData(LocalDBItems.employeeDetails);
+      const params = {
+        org_id: employeeDetails.org_id,
+        eventName: "FaceReconization_CheckIn_Faliure",
+        emp_id: employeeDetails.id,
+        imgUrl: cloudinaryData.url,
+        emp_Name: employeeDetails.full_name,
+        createdDate: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+        modifiedDate: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+      };
+
+      // Send to your API
+      const requestObj = {
+        endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_FORCE_TIMESHEET_CHECKIN,
+        type: "post",
+        params: params,
+      };
+      console.log(requestObj);
+
+      const apiResponseData = await apiService(requestObj);
+
+      if (apiResponseData.status == "200") {
+        counter_face_data = 0;
+        this.Mobile_ID = apiResponseData.desc;
+
+        if (this.timer) {
+          clearInterval(this.timer);
+        }
+
+        this.setState({
+          showAlertIdNoFace: false,
+          isVerifyFace: false
+        });
+
+        Alert.alert(
+          'Face Error Occurred',
+          'We failed to recognize your face. A report has been submitted.',
+          [{ text: 'OK', onPress: () => this.handleSubmission() }]
+        );
+
+        this.showTimerWhenFaceDetected();
+      } else {
+        console.log("API Error", apiResponseData);
+        Alert.alert('Error', 'Failed to submit error report');
+      }
+    } catch (err) {
+      console.log('Error in takeErrorPicture:', err);
+      Alert.alert('Error', 'Failed to capture error picture');
       if (this.timer) {
         clearInterval(this.timer);
       }
-      
-      this.setState({ 
-        showAlertIdNoFace: false, 
-        isVerifyFace: false 
-      });
-
-      Alert.alert(
-        'Face Error Occurred', 
-        'We failed to recognize your face. A report has been submitted.',
-        [{ text: 'OK', onPress: () => this.handleSubmission() }]
-      );
-
-      this.showTimerWhenFaceDetected();
-    } else {
-      console.log("API Error", apiResponseData);
-      Alert.alert('Error', 'Failed to submit error report');
     }
-  } catch (err) {
-    console.log('Error in takeErrorPicture:', err);
-    Alert.alert('Error', 'Failed to capture error picture');
-    if (this.timer) {
-      clearInterval(this.timer);
-    }
-  }
-};
+  };
 
 
 
@@ -893,348 +924,348 @@ takeErrorPicture = async (base64) => {
 
 
   verifyFace = async (base64) => {
-  const employeeDetails = await getData(LocalDBItems.employeeDetails);
+    const employeeDetails = await getData(LocalDBItems.employeeDetails);
 
-  try {
-    // 🚨 If max attempts reached, skip verification and go for force check-in
-    if (counter_face_data >= 2) {
-      console.log("Face Error - Max attempts reached. Going for Force Check-In...");
-      this.setState({ isVerifyFace: false });
-      
-      // Directly send the captured base64 image for force check-in
-      await this.takeErrorPicture(base64);
+    try {
+      // 🚨 If max attempts reached, skip verification and go for force check-in
+      if (counter_face_data >= 2) {
+        console.log("Face Error - Max attempts reached. Going for Force Check-In...");
+        this.setState({ isVerifyFace: false });
 
-      this.count = 0;
-      return false;
-    }
+        // Directly send the captured base64 image for force check-in
+        await this.takeErrorPicture(base64);
 
-    // 🔍 Process normal face verification
-    const filename = `${employeeDetails.first_name.toLowerCase()}.jpeg`;
-    const collection_id = `face-collection-${employeeDetails.first_name.toLowerCase()}`;
-    
-    const faceVerifyResult = await searchFaceImages(base64, filename, collection_id);
-    console.log(faceVerifyResult, "faceVerifyResult");
-    console.log("COUNTER FACE DATA:", counter_face_data);
-
-    // Handle API errors first (timeout or 400)
-    if (faceVerifyResult.errorType === 'Sandbox.Timedout' || faceVerifyResult.statusCode === 400) {
-      this.count += 1;
-      if (this.count >= 2) {
-        this.setState({
-          showAlertIdNoFace: true,
-          isVerifyFace: false,
-          alertMessage: "Face verification timed out. Please try again."
-        });
-        clearInterval(this.timer);
-      } else {
-         this.takePicture();
+        this.count = 0;
+        return false;
       }
-      return false;
-    }
 
-    // ✅ Process successful face recognition
-    const faceResult = faceVerifyResult.FaceMatches;
-    if (faceResult?.length > 0 && faceResult[0].Face?.ExternalImageId) {
-      if (faceResult[0].Face.ExternalImageId.includes(employeeDetails.first_name.toLowerCase())) {
-        clearInterval(this.timer);
-        
-        if (this.state.isTeamClicked) {
-          this.employeeDetails.isFaceVerified = true;
-          if (this.modalizeRef.current) {
-            this.ModalOpen = true;
-            this.modalizeRef.current.open();
-          }
+      // 🔍 Process normal face verification
+      const filename = `${employeeDetails.first_name.toLowerCase()}.jpeg`;
+      const collection_id = `face-collection-${employeeDetails.first_name.toLowerCase()}`;
+
+      const faceVerifyResult = await searchFaceImages(base64, filename, collection_id);
+      console.log(faceVerifyResult, "faceVerifyResult");
+      console.log("COUNTER FACE DATA:", counter_face_data);
+
+      // Handle API errors first (timeout or 400)
+      if (faceVerifyResult.errorType === 'Sandbox.Timedout' || faceVerifyResult.statusCode === 400) {
+        this.count += 1;
+        if (this.count >= 2) {
+          this.setState({
+            showAlertIdNoFace: true,
+            isVerifyFace: false,
+            alertMessage: "Face verification timed out. Please try again."
+          });
+          clearInterval(this.timer);
         } else {
-          this.state.isForceCheckIn 
-            ? this.addTimesheetForceCheckIn() 
-            : this.addTimesheetCheckIn();
+          this.takePicture();
         }
-        return true;
-      } else {
-        return this.handleFailedVerification("Face not recognized. Please try again.");
+        return false;
       }
-    } else {
-      return this.handleFailedVerification("No matching face found. Please try again.");
+
+      // ✅ Process successful face recognition
+      const faceResult = faceVerifyResult.FaceMatches;
+      if (faceResult?.length > 0 && faceResult[0].Face?.ExternalImageId) {
+        if (faceResult[0].Face.ExternalImageId.includes(employeeDetails.first_name.toLowerCase())) {
+          clearInterval(this.timer);
+
+          if (this.state.isTeamClicked) {
+            this.employeeDetails.isFaceVerified = true;
+            if (this.modalizeRef.current) {
+              this.ModalOpen = true;
+              this.modalizeRef.current.open();
+            }
+          } else {
+            this.state.isForceCheckIn
+              ? this.addTimesheetForceCheckIn()
+              : this.addTimesheetCheckIn();
+          }
+          return true;
+        } else {
+          return this.handleFailedVerification("Face not recognized. Please try again.");
+        }
+      } else {
+        return this.handleFailedVerification("No matching face found. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error in verifyFace:", err);
+      this.setState({
+        showAlertIdNoFace: true,
+        isVerifyFace: false,
+        alertMessage: "An error occurred. Please try again."
+      });
+      clearInterval(this.timer);
+      return false;
     }
-  } catch (err) {
-    console.error("Error in verifyFace:", err);
+  };
+
+
+  // Helper function for failed verification cases
+  handleFailedVerification = (message) => {
+    counter_face_data += 1; // make sure we're tracking attempts globally
+    this.count += 1;
+
+    // Always show popup for failed attempts
     this.setState({
       showAlertIdNoFace: true,
       isVerifyFace: false,
-      alertMessage: "An error occurred. Please try again."
+      alertMessage: message
     });
-    clearInterval(this.timer);
+
+    // Open your custom popup modal
+    if (this.modalizeRef.current && !this.ModalOpen) {
+      this.ModalOpen = true;
+      this.modalizeRef.current.open();
+    }
+
+    // If max attempts reached, stop retry
+    if (this.count >= 2) {
+      return false;
+    }
+
+    // Retry after popup is shown
+    setTimeout(() => {
+      this.takePicture();
+    }, 2000); // wait 2 seconds before retry
     return false;
-  }
-};
-
-
-// Helper function for failed verification cases
-handleFailedVerification = (message) => {
-  counter_face_data += 1; // make sure we're tracking attempts globally
-  this.count += 1;
-
-  // Always show popup for failed attempts
-  this.setState({
-    showAlertIdNoFace: true,
-    isVerifyFace: false,
-    alertMessage: message
-  });
-
-  // Open your custom popup modal
-  if (this.modalizeRef.current && !this.ModalOpen) {
-    this.ModalOpen = true;
-    this.modalizeRef.current.open();
-  }
-
-  // If max attempts reached, stop retry
-  if (this.count >= 2) {
-    return false;
-  }
-
-  // Retry after popup is shown
-  setTimeout(() => {
-    this.takePicture();
-  }, 2000); // wait 2 seconds before retry
-  return false;
-};
+  };
 
 
   /**
    * Add Time sheet API call after face is verified
    */
-addTimesheetCheckIn = async () => {
+  addTimesheetCheckIn = async () => {
     try {
-        let UUID = await getUUID();
-        let checkIsInRadius = false;
-        
-        // Check office radius if applicable
-        if (this.state.isOffice) {
-            checkIsInRadius = await this.locationFetcher.isLocationInRadius();
-        }
+      let UUID = await getUUID();
+      let checkIsInRadius = false;
 
-        const {
-            manulLocation,
-            getSelectedProjectData,
-            selectedTab,
-            teamId,
-            teamMemberEmpId,
-            isOffice,
-            isWorkFromHome,
-            isManual,
-            organisationDetails,
-        } = this.state;
+      // Check office radius if applicable
+      if (this.state.isOffice) {
+        checkIsInRadius = await this.locationFetcher.isLocationInRadius();
+      }
 
-        const employeeDetails = await getData(LocalDBItems.employeeDetails);
-        const locationtracking = await getData(LocalDBItems.isEmployeeLocationTrack);
-        
-        // Prepare view models based on check-in type
-        let timesheetSearchLocationViewModel = {};
-        let timesheetCategoryViewModel = {};
-        
-        if (isOffice) {
-            this.isProject = false;
-            timesheetCategoryViewModel = {
-                project_category_type: "Office",
-                project_or_comp_id: organisationDetails.org_id,
-                project_or_comp_name: organisationDetails.org_name,
-                project_or_comp_type: null,
-            };
+      const {
+        manulLocation,
+        getSelectedProjectData,
+        selectedTab,
+        teamId,
+        teamMemberEmpId,
+        isOffice,
+        isWorkFromHome,
+        isManual,
+        organisationDetails,
+      } = this.state;
 
-            timesheetSearchLocationViewModel = {
-                manual_address: "",
-                geo_address: organisationDetails.entityLocation.geo_address,
-                formatted_address: organisationDetails.entityLocation.formatted_address,
-                lat: organisationDetails.entityLocation.lat,
-                lang: organisationDetails.entityLocation.lang,
-                street_number: organisationDetails.entityLocation.street_number,
-                route: organisationDetails.entityLocation.route,
-                locality: organisationDetails.entityLocation.locality,
-                administrative_area_level_2: organisationDetails.entityLocation.administrative_area_level_2,
-                administrative_area_level_1: organisationDetails.entityLocation.administrative_area_level_1,
-                postal_code: organisationDetails.entityLocation.postal_code,
-                country: organisationDetails.entityLocation.country,
-                is_office: true,
-                is_manual: false,
-                is_wfh: false,
-            };
-        } else if (isWorkFromHome) {
-            timesheetCategoryViewModel = {
-                project_category_type: "Place",
-                project_or_comp_id: null,
-                project_or_comp_name: this.currentLocationObj.formatted_address,
-                project_or_comp_type: null,
-            };
+      const employeeDetails = await getData(LocalDBItems.employeeDetails);
+      const locationtracking = await getData(LocalDBItems.isEmployeeLocationTrack);
 
-            timesheetSearchLocationViewModel = {
-                manual_address: "",
-                geo_address: this.currentLocationObj.formatted_address,
-                formatted_address: this.currentLocationObj.formatted_address,
-                lat: this.currentLocationObj.latitude,
-                lang: this.currentLocationObj.longitude,
-                street_number: this.currentLocationObj.street_number,
-                route: this.currentLocationObj.route,
-                locality: this.currentLocationObj.locality,
-                administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
-                administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
-                postal_code: this.currentLocationObj.postal_code,
-                country: this.currentLocationObj.country,
-                is_office: false,
-                is_manual: false,
-                is_wfh: true,
-            };
-            checkIsInRadius = true;
-        } else if (isManual) {
-            timesheetCategoryViewModel = {
-                project_category_type: "Place",
-                project_or_comp_id: null,
-                project_or_comp_name: manulLocation,
-                project_or_comp_type: null,
-            };
-            timesheetSearchLocationViewModel = {
-                manual_address: manulLocation,
-                geo_address: this.currentLocationObj.formatted_address,
-                formatted_address: this.currentLocationObj.formatted_address,
-                lat: this.currentLocationObj.latitude,
-                lang: this.currentLocationObj.longitude,
-                street_number: this.currentLocationObj.street_number,
-                route: this.currentLocationObj.route,
-                locality: this.currentLocationObj.locality,
-                administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
-                administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
-                postal_code: this.currentLocationObj.postal_code,
-                country: this.currentLocationObj.country,
-                is_office: false,
-                is_manual: true,
-                is_wfh: false,
-            };
-        } else {
-            if (this.state.selectedTab === 2) {
-                timesheetCategoryViewModel = {
-                    project_category_type: "Place",
-                    project_or_comp_id: null,
-                    project_or_comp_name: this.currentLocationObj.formatted_address,
-                    project_or_comp_type: "",
-                };
-                timesheetSearchLocationViewModel = {
-                    manual_address: "",
-                    geo_address: this.currentLocationObj.formatted_address,
-                    formatted_address: this.currentLocationObj.formatted_address,
-                    lat: this.currentLocationObj.latitude,
-                    lang: this.currentLocationObj.longitude,
-                    street_number: this.currentLocationObj.street_number,
-                    route: this.currentLocationObj.route,
-                    locality: this.currentLocationObj.locality,
-                    administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
-                    administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
-                    postal_code: this.currentLocationObj.postal_code,
-                    country: this.currentLocationObj.country,
-                    is_office: false,
-                    is_manual: false,
-                    is_wfh: false,
-                };
-            } else {
-                timesheetCategoryViewModel = {
-                    project_category_type: "Job",
-                    project_or_comp_id: getSelectedProjectData.project_id,
-                    project_or_comp_name: getSelectedProjectData.project_name,
-                    project_or_comp_type: "",
-                };
-                timesheetSearchLocationViewModel = null;
-            }
-            this.isProject = !!getSelectedProjectData.project_id;
-            this.state.isOffice = false;
-        }
+      // Prepare view models based on check-in type
+      let timesheetSearchLocationViewModel = {};
+      let timesheetCategoryViewModel = {};
 
-        // Prepare parameters for API call
-        const params = {
-            team_member_empid: teamMemberEmpId,
-            teamid: teamId,
-            check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-            is_app_check_In: true,
-            checkin_tag_id: UUID,
-            is_app_version: version.version,
-            createdby: employeeDetails.full_name,
-            checkin_user_empid: employeeDetails.id,
-            is_inrange: checkIsInRadius,
-            timesheetCategoryViewModel: timesheetCategoryViewModel,
-            timesheetSearchLocationViewModel: timesheetSearchLocationViewModel,
-            timesheetCurrentLocationViewModel: {
-                geo_address: this.currentLocationObj.formatted_address,
-                formatted_address: this.currentLocationObj.formatted_address,
-                lat: this.currentLocationObj.latitude,
-                lang: this.currentLocationObj.longitude,
-                street_number: this.currentLocationObj.street_number,
-                route: this.currentLocationObj.route,
-                locality: this.currentLocationObj.locality,
-                administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
-                administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
-                postal_code: this.currentLocationObj.postal_code,
-                country: this.currentLocationObj.country,
-            },
+      if (isOffice) {
+        this.isProject = false;
+        timesheetCategoryViewModel = {
+          project_category_type: "Office",
+          project_or_comp_id: organisationDetails.org_id,
+          project_or_comp_name: organisationDetails.org_name,
+          project_or_comp_type: null,
         };
 
-        // Make API call
-        const requestObj = {
-            endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_TIMESHEET_CHECKIN,
-            type: "post",
-            params: params,
+        timesheetSearchLocationViewModel = {
+          manual_address: "",
+          geo_address: organisationDetails.entityLocation.geo_address,
+          formatted_address: organisationDetails.entityLocation.formatted_address,
+          lat: organisationDetails.entityLocation.lat,
+          lang: organisationDetails.entityLocation.lang,
+          street_number: organisationDetails.entityLocation.street_number,
+          route: organisationDetails.entityLocation.route,
+          locality: organisationDetails.entityLocation.locality,
+          administrative_area_level_2: organisationDetails.entityLocation.administrative_area_level_2,
+          administrative_area_level_1: organisationDetails.entityLocation.administrative_area_level_1,
+          postal_code: organisationDetails.entityLocation.postal_code,
+          country: organisationDetails.entityLocation.country,
+          is_office: true,
+          is_manual: false,
+          is_wfh: false,
         };
-        
-        const apiResponseData = await apiService(requestObj);
-        
-        if (apiResponseData.status == "200") {
-            // Clear any existing timers
-            if (this.timer != null) {
-                clearInterval(this.timer);
-            }
+      } else if (isWorkFromHome) {
+        timesheetCategoryViewModel = {
+          project_category_type: "Place",
+          project_or_comp_id: null,
+          project_or_comp_name: this.currentLocationObj.formatted_address,
+          project_or_comp_type: null,
+        };
 
-            // Store check-in data
-            const checkInCheckOutData = {
-                checkin_out_project: params.timesheetCategoryViewModel.project_or_comp_name,
-                checkin_out_jobType: params.timesheetCategoryViewModel.project_category_type
-            };
-            const checkinInfo = {
-                isOfficeChecin: this.state.isOffice,
-                isProjectCheckin: this.isProject,
-            };
-            
-            await storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData);
-            await storeData(LocalDBItems.checkInInfo, checkinInfo);
-            
-            // Handle location tracking
-            if (locationtracking) {
-                await storeData(LocalDBItems.isEmployeeLocationTrack, true);
-            } else {
-                await storeData(LocalDBItems.isEmployeeLocationTrack, false);
-                this.locationFetcher.removeLocationUpdate();
-            }
-
-            // Navigate to HomeScreen with refresh parameters
-            this.props.navigation.navigate('HomeScreen', {
-                refresh: true,
-                checkInLocation: this.currentLocationObj,
-                checkInTime: params.check_in,
-                isNewCheckIn: true
-            });
-
-            // Show success message
-            const full_name = `${employeeDetails.full_name} checked in successfully`;
-            Toast.show(full_name, Toast.LONG);
+        timesheetSearchLocationViewModel = {
+          manual_address: "",
+          geo_address: this.currentLocationObj.formatted_address,
+          formatted_address: this.currentLocationObj.formatted_address,
+          lat: this.currentLocationObj.latitude,
+          lang: this.currentLocationObj.longitude,
+          street_number: this.currentLocationObj.street_number,
+          route: this.currentLocationObj.route,
+          locality: this.currentLocationObj.locality,
+          administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
+          administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
+          postal_code: this.currentLocationObj.postal_code,
+          country: this.currentLocationObj.country,
+          is_office: false,
+          is_manual: false,
+          is_wfh: true,
+        };
+        checkIsInRadius = true;
+      } else if (isManual) {
+        timesheetCategoryViewModel = {
+          project_category_type: "Place",
+          project_or_comp_id: null,
+          project_or_comp_name: manulLocation,
+          project_or_comp_type: null,
+        };
+        timesheetSearchLocationViewModel = {
+          manual_address: manulLocation,
+          geo_address: this.currentLocationObj.formatted_address,
+          formatted_address: this.currentLocationObj.formatted_address,
+          lat: this.currentLocationObj.latitude,
+          lang: this.currentLocationObj.longitude,
+          street_number: this.currentLocationObj.street_number,
+          route: this.currentLocationObj.route,
+          locality: this.currentLocationObj.locality,
+          administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
+          administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
+          postal_code: this.currentLocationObj.postal_code,
+          country: this.currentLocationObj.country,
+          is_office: false,
+          is_manual: true,
+          is_wfh: false,
+        };
+      } else {
+        if (this.state.selectedTab === 2) {
+          timesheetCategoryViewModel = {
+            project_category_type: "Place",
+            project_or_comp_id: null,
+            project_or_comp_name: this.currentLocationObj.formatted_address,
+            project_or_comp_type: "",
+          };
+          timesheetSearchLocationViewModel = {
+            manual_address: "",
+            geo_address: this.currentLocationObj.formatted_address,
+            formatted_address: this.currentLocationObj.formatted_address,
+            lat: this.currentLocationObj.latitude,
+            lang: this.currentLocationObj.longitude,
+            street_number: this.currentLocationObj.street_number,
+            route: this.currentLocationObj.route,
+            locality: this.currentLocationObj.locality,
+            administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
+            administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
+            postal_code: this.currentLocationObj.postal_code,
+            country: this.currentLocationObj.country,
+            is_office: false,
+            is_manual: false,
+            is_wfh: false,
+          };
         } else {
-            throw new Error(apiResponseData.message || "Check-in failed");
+          timesheetCategoryViewModel = {
+            project_category_type: "Job",
+            project_or_comp_id: getSelectedProjectData.project_id,
+            project_or_comp_name: getSelectedProjectData.project_name,
+            project_or_comp_type: "",
+          };
+          timesheetSearchLocationViewModel = null;
         }
-    } catch (error) {
-        console.error("Check-in error:", error);
-        Toast.show(error.message || "Check-in failed", Toast.LONG);
-        
-        // Re-enable UI elements if needed
-        this.setState({
-            showCameraLoader: false,
-            isVerifyFace: false
+        this.isProject = !!getSelectedProjectData.project_id;
+        this.state.isOffice = false;
+      }
+
+      // Prepare parameters for API call
+      const params = {
+        team_member_empid: teamMemberEmpId,
+        teamid: teamId,
+        check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+        is_app_check_In: true,
+        checkin_tag_id: UUID,
+        is_app_version: version.version,
+        createdby: employeeDetails.full_name,
+        checkin_user_empid: employeeDetails.id,
+        is_inrange: checkIsInRadius,
+        timesheetCategoryViewModel: timesheetCategoryViewModel,
+        timesheetSearchLocationViewModel: timesheetSearchLocationViewModel,
+        timesheetCurrentLocationViewModel: {
+          geo_address: this.currentLocationObj.formatted_address,
+          formatted_address: this.currentLocationObj.formatted_address,
+          lat: this.currentLocationObj.latitude,
+          lang: this.currentLocationObj.longitude,
+          street_number: this.currentLocationObj.street_number,
+          route: this.currentLocationObj.route,
+          locality: this.currentLocationObj.locality,
+          administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
+          administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
+          postal_code: this.currentLocationObj.postal_code,
+          country: this.currentLocationObj.country,
+        },
+      };
+
+      // Make API call
+      const requestObj = {
+        endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_TIMESHEET_CHECKIN,
+        type: "post",
+        params: params,
+      };
+
+      const apiResponseData = await apiService(requestObj);
+
+      if (apiResponseData.status == "200") {
+        // Clear any existing timers
+        if (this.timer != null) {
+          clearInterval(this.timer);
+        }
+
+        // Store check-in data
+        const checkInCheckOutData = {
+          checkin_out_project: params.timesheetCategoryViewModel.project_or_comp_name,
+          checkin_out_jobType: params.timesheetCategoryViewModel.project_category_type
+        };
+        const checkinInfo = {
+          isOfficeChecin: this.state.isOffice,
+          isProjectCheckin: this.isProject,
+        };
+
+        await storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData);
+        await storeData(LocalDBItems.checkInInfo, checkinInfo);
+
+        // Handle location tracking
+        if (locationtracking) {
+          await storeData(LocalDBItems.isEmployeeLocationTrack, true);
+        } else {
+          await storeData(LocalDBItems.isEmployeeLocationTrack, false);
+          this.locationFetcher.removeLocationUpdate();
+        }
+
+        // Navigate to HomeScreen with refresh parameters
+        this.props.navigation.navigate('HomeScreen', {
+          refresh: true,
+          checkInLocation: this.currentLocationObj,
+          checkInTime: params.check_in,
+          isNewCheckIn: true
         });
+
+        // Show success message
+        const full_name = `${employeeDetails.full_name} checked in successfully`;
+        Toast.show(full_name, Toast.LONG);
+      } else {
+        throw new Error(apiResponseData.message || "Check-in failed");
+      }
+    } catch (error) {
+      console.error("Check-in error:", error);
+      Toast.show(error.message || "Check-in failed", Toast.LONG);
+
+      // Re-enable UI elements if needed
+      this.setState({
+        showCameraLoader: false,
+        isVerifyFace: false
+      });
     }
-};
+  };
 
   /**
  * Add Time sheet API call after face is verified when forcecheckin
@@ -1427,7 +1458,7 @@ addTimesheetCheckIn = async () => {
     console.log("responseData", apiResponseData)
   };
 
-  
+
   handleIndexChange = (index) => {
     switch (index) {
       case CategortTeam.DEPARTMENT_ID:
@@ -1692,95 +1723,95 @@ addTimesheetCheckIn = async () => {
     }
   };
 
-GetAllTimesheetListByEmployeeID = async () => {
-  const employeDetails = await getData(LocalDBItems.employeeDetails);
-  const locationtracking = await getData(LocalDBItems.isEmployeeLocationTrack);
-  let params = { orgID: employeDetails.org_id };
-  const requestObj = {
-    endpoint: BaseUrl.API_BASE_URL + Endpoint.GETALL_APPROVAL_DATA,
-    type: "patch",
-    params: params,
-  };
-  const apiResponseData = await apiService(requestObj);
-  const emp_role_id = employeDetails.role_id;
-  const section_id_data = apiResponseData.filter(item => item.section_id === '8a55082f-5185-4d28-9098-4f268cb47d51' && item.role_id === emp_role_id);
+  GetAllTimesheetListByEmployeeID = async () => {
+    const employeDetails = await getData(LocalDBItems.employeeDetails);
+    const locationtracking = await getData(LocalDBItems.isEmployeeLocationTrack);
+    let params = { orgID: employeDetails.org_id };
+    const requestObj = {
+      endpoint: BaseUrl.API_BASE_URL + Endpoint.GETALL_APPROVAL_DATA,
+      type: "patch",
+      params: params,
+    };
+    const apiResponseData = await apiService(requestObj);
+    const emp_role_id = employeDetails.role_id;
+    const section_id_data = apiResponseData.filter(item => item.section_id === '8a55082f-5185-4d28-9098-4f268cb47d51' && item.role_id === emp_role_id);
 
-  let params2 = {
-    id: employeDetails.id
-  };
-  const requestObj2 = {
-    endpoint: BaseUrl.API_BASE_URL + Endpoint.GET_ALL_TIMESHEET_LISTBY_EMPLOYEEID,
-    type: "post",
-    params: params2,
-  };
-  const apiResponseData2 = await apiService(requestObj2);
+    let params2 = {
+      id: employeDetails.id
+    };
+    const requestObj2 = {
+      endpoint: BaseUrl.API_BASE_URL + Endpoint.GET_ALL_TIMESHEET_LISTBY_EMPLOYEEID,
+      type: "post",
+      params: params2,
+    };
+    const apiResponseData2 = await apiService(requestObj2);
 
-  const lastest_time = apiResponseData2[0]["timesheetDataModels"][0]["id"];
+    const lastest_time = apiResponseData2[0]["timesheetDataModels"][0]["id"];
 
-  let params3 = {
-    org_id: employeDetails.org_id,
-    refrence_id: this.Mobile_ID,
-    type: "checkin",
-    empid: employeDetails.id,
-    timesheet_id: lastest_time,
-    ondate: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-    check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-    checkin_lat: this.currentLocationObj.latitude,
-    checkin_lang: this.currentLocationObj.longitude,
-    check_out: null,
-    checkout_lat: null,
-    checkout_lang: null,
-    levelone_roleId: section_id_data[0].approver1_roleId,
-    isapproved_levelone: false,
-    leveltwo_roleId: section_id_data[0].approver2_roleId,
-    isapproved_leveltwo: false,
-    reason_name: this.reason_location + this.reason_face,
-    status: "pending",
-    created_date: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-    createdby: employeDetails.id,
-    modified_date: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-    modifiedby: employeDetails.id,
-    is_deleted: false,
-    is_app_check_In: true
-  };
-  
-  const requestObj3 = {
-    endpoint: BaseUrl.API_BASE_URL + Endpoint.FORCE_CHECKIN_REQUEST,
-    type: "post",
-    params: params3,
-  };
-  const apiResponseData3 = await apiService(requestObj3);
-  
-  this.setState({ isForcecheckout: true });
-  const checkInCheckOutData = {
-    checkin_out_project: null,
-    checkin_out_jobType: null
-  };
-  const checkinInfo = {
-    isOfficeChecin: this.state.isOffice,
-    isProjectCheckin: this.isProject,
-  };
-  
-  await storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData);
-  await storeData(LocalDBItems.checkInInfo, checkinInfo);
-  
-  if (!locationtracking) {
-    await storeData(LocalDBItems.isEmployeeLocationTrack, false);
-    this.locationFetcher.removeLocationUpdate();
-  } else {
-    await storeData(LocalDBItems.isEmployeeLocationTrack, true);
-  }
+    let params3 = {
+      org_id: employeDetails.org_id,
+      refrence_id: this.Mobile_ID,
+      type: "checkin",
+      empid: employeDetails.id,
+      timesheet_id: lastest_time,
+      ondate: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+      check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+      checkin_lat: this.currentLocationObj.latitude,
+      checkin_lang: this.currentLocationObj.longitude,
+      check_out: null,
+      checkout_lat: null,
+      checkout_lang: null,
+      levelone_roleId: section_id_data[0].approver1_roleId,
+      isapproved_levelone: false,
+      leveltwo_roleId: section_id_data[0].approver2_roleId,
+      isapproved_leveltwo: false,
+      reason_name: this.reason_location + this.reason_face,
+      status: "pending",
+      created_date: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+      createdby: employeDetails.id,
+      modified_date: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+      modifiedby: employeDetails.id,
+      is_deleted: false,
+      is_app_check_In: true
+    };
 
-  this.props.navigation.navigate('HomeScreen', {
-    refresh: true,
-    checkInLocation: this.currentLocationObj,
-    checkInTime: params3.check_in,
-    isNewCheckIn: true
-  });
+    const requestObj3 = {
+      endpoint: BaseUrl.API_BASE_URL + Endpoint.FORCE_CHECKIN_REQUEST,
+      type: "post",
+      params: params3,
+    };
+    const apiResponseData3 = await apiService(requestObj3);
 
-  const full_name = `${employeDetails.full_name} Force checked in successfully`;
-  Toast.show(full_name, Toast.LONG);
-};
+    this.setState({ isForcecheckout: true });
+    const checkInCheckOutData = {
+      checkin_out_project: null,
+      checkin_out_jobType: null
+    };
+    const checkinInfo = {
+      isOfficeChecin: this.state.isOffice,
+      isProjectCheckin: this.isProject,
+    };
+
+    await storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData);
+    await storeData(LocalDBItems.checkInInfo, checkinInfo);
+
+    if (!locationtracking) {
+      await storeData(LocalDBItems.isEmployeeLocationTrack, false);
+      this.locationFetcher.removeLocationUpdate();
+    } else {
+      await storeData(LocalDBItems.isEmployeeLocationTrack, true);
+    }
+
+    this.props.navigation.navigate('HomeScreen', {
+      refresh: true,
+      checkInLocation: this.currentLocationObj,
+      checkInTime: params3.check_in,
+      isNewCheckIn: true
+    });
+
+    const full_name = `${employeDetails.full_name} Force checked in successfully`;
+    Toast.show(full_name, Toast.LONG);
+  };
 
 
 
@@ -2754,7 +2785,7 @@ GetAllTimesheetListByEmployeeID = async () => {
 
 
   // Face detection
- 
+
 
   onViewDescription = () => {
     this.setState({ isViewDecription: true });
@@ -2966,14 +2997,14 @@ GetAllTimesheetListByEmployeeID = async () => {
   //     return this.currentLocationObj.formatted_address;
   //   }
   // };
-  
- getLocationAddressForPlace = () => {
-  // Check if currentLocationObj exists and has formatted_address
-  if (this.currentLocationObj && this.currentLocationObj.formatted_address) {
-    return this.currentLocationObj.formatted_address;
-  }
-  return "Loading location..."; // Fallback text
-};
+
+  getLocationAddressForPlace = () => {
+    // Check if currentLocationObj exists and has formatted_address
+    if (this.currentLocationObj && this.currentLocationObj.formatted_address) {
+      return this.currentLocationObj.formatted_address;
+    }
+    return "Loading location..."; // Fallback text
+  };
 
   renderCaseTabView() {
     return (
@@ -2987,89 +3018,89 @@ GetAllTimesheetListByEmployeeID = async () => {
     this.currentLocationObj = placeInfo;
   };
 
-renderPlaceTabView() {
-  const {
-    isPlace,
-    isManual,
-    isOffice,
-    isWorkFromHome,
-    officeAddressPlace,
-    manualAddress
-  } = this.state;
+  renderPlaceTabView() {
+    const {
+      isPlace,
+      isManual,
+      isOffice,
+      isWorkFromHome,
+      officeAddressPlace,
+      manualAddress
+    } = this.state;
 
-  return (
-    <View style={{ backgroundColor: 'white' }}>
-      <SwitchViewNew
-        onChooseOffice={(value) => this.onChoosePlaceOffice(true)}
-        isOffice={this.state.isOffice}
-        onChooseWrkFromHome={(value) => this.onChoosePlaceWrkFrmHome(value)}
-        isWorkFromHome={this.state.isWorkFromHome}
-        onChoosePlace={(value) => this.onChoosePlace(value)}
-        isPlace={this.state.isPlace}
-      />
-      
-      {this.state.isOffice && !this.state.isPlace && this.state.officeAddressPlace.length > 0 ? (
-        <DropDownPicker
-          open={this.state.dropdownOpen}
-          value={this.state.selectedOfficeValue}
-          items={this.state.officeAddressPlace}
-          setOpen={(open) => this.setState({ dropdownOpen: open })}
-          setValue={(callback) => {
-            const value = callback(this.state.selectedOfficeValue);
-            const selectedItem = this.state.officeAddressPlace.find(item => item.value === value);
-            const index = this.state.officeAddressPlace.findIndex(item => item.value === value);
-            this.setState({ selectedOfficeValue: value });
-            this.onSelectOfficeLocation(selectedItem, index);
-          }}
-          setItems={(items) => this.setState({ officeAddressPlace: items })}
-          placeholder="Select office"
-          searchable={true}
-          searchPlaceholder="Search for office"
-          containerStyle={{
-            height: 60,
-            width: '90%',
-            alignSelf: 'center',
-            marginTop: 20,
-          }}
-          style={[
-            styles.dropDownContainer,
-            { marginTop: 5, backgroundColor: 'lightgrey' },
-          ]}
-          dropDownContainerStyle={{
-            backgroundColor: '#fcfcfc',
-            zIndex: 10000,
-          }}
-          textStyle={{
-            fontSize: 16,
-            color: '#000',
-          }}
+    return (
+      <View style={{ backgroundColor: 'white' }}>
+        <SwitchViewNew
+          onChooseOffice={(value) => this.onChoosePlaceOffice(true)}
+          isOffice={this.state.isOffice}
+          onChooseWrkFromHome={(value) => this.onChoosePlaceWrkFrmHome(value)}
+          isWorkFromHome={this.state.isWorkFromHome}
+          onChoosePlace={(value) => this.onChoosePlace(value)}
+          isPlace={this.state.isPlace}
         />
-      ) : (
-        <LocationText
-          locationName={this.state.isManual ? this.state.manualAddress : this.getLocationAddressForPlace()}
-          isEditabe={this.state.isManual}
-          setLocationName={(text) => this.setLocationName(text)}
-        />
-      )}
 
-      {isPlace && (
-        <MapViewEnforce
-          coordinate={this.cordinateObj}
-          height={windowHeight * 0.4}
-          locationName={this.getLocationAddressForPlace()}
-          getWFHInfo={(placeInfo) => this.getWFHInfo(placeInfo)}
-        />
-      )}
-      
-      {!isWorkFromHome && (
-        <View style={[styles.teamContainer, { marginLeft: 24 }]}>
-          {this.renderTeamSwitch()}
-        </View>
-      )}
-    </View>
-  );
-}
-  
+        {this.state.isOffice && !this.state.isPlace && this.state.officeAddressPlace.length > 0 ? (
+          <DropDownPicker
+            open={this.state.dropdownOpen}
+            value={this.state.selectedOfficeValue}
+            items={this.state.officeAddressPlace}
+            setOpen={(open) => this.setState({ dropdownOpen: open })}
+            setValue={(callback) => {
+              const value = callback(this.state.selectedOfficeValue);
+              const selectedItem = this.state.officeAddressPlace.find(item => item.value === value);
+              const index = this.state.officeAddressPlace.findIndex(item => item.value === value);
+              this.setState({ selectedOfficeValue: value });
+              this.onSelectOfficeLocation(selectedItem, index);
+            }}
+            setItems={(items) => this.setState({ officeAddressPlace: items })}
+            placeholder="Select office"
+            searchable={true}
+            searchPlaceholder="Search for office"
+            containerStyle={{
+              height: 60,
+              width: '90%',
+              alignSelf: 'center',
+              marginTop: 20,
+            }}
+            style={[
+              styles.dropDownContainer,
+              { marginTop: 5, backgroundColor: 'lightgrey' },
+            ]}
+            dropDownContainerStyle={{
+              backgroundColor: '#fcfcfc',
+              zIndex: 10000,
+            }}
+            textStyle={{
+              fontSize: 16,
+              color: '#000',
+            }}
+          />
+        ) : (
+          <LocationText
+            locationName={this.state.isManual ? this.state.manualAddress : this.getLocationAddressForPlace()}
+            isEditabe={this.state.isManual}
+            setLocationName={(text) => this.setLocationName(text)}
+          />
+        )}
+
+        {isPlace && (
+          <MapViewEnforce
+            coordinate={this.cordinateObj}
+            height={windowHeight * 0.4}
+            locationName={this.getLocationAddressForPlace()}
+            getWFHInfo={(placeInfo) => this.getWFHInfo(placeInfo)}
+          />
+        )}
+
+        {!isWorkFromHome && (
+          <View style={[styles.teamContainer, { marginLeft: 24 }]}>
+            {this.renderTeamSwitch()}
+          </View>
+        )}
+      </View>
+    );
+  }
+
   // getCurrentPage() {
   //   if (this.state.selectedTab == 0) {
   //     return this.renderJobTabView();
@@ -3092,41 +3123,41 @@ renderPlaceTabView() {
     longitudeDelta: LONGITUDE_DELTA,
   });
 
-getLoctionObj = async (locationObj) => {
-  try {
-    // Update coordinates immediately
-    this.cordinateObj = {
-      latitude: locationObj.latitude,
-      longitude: locationObj.longitude
-    };
+  getLoctionObj = async (locationObj) => {
+    try {
+      // Update coordinates immediately
+      this.cordinateObj = {
+        latitude: locationObj.latitude,
+        longitude: locationObj.longitude
+      };
 
-    // Only fetch geocode details if we don't already have them
-    if (!this.currentLocationObj.formatted_address || Platform.OS === 'ios') {
-      const locationDetails = await this.geoCoder.getPlaceFromCordinate(
-        locationObj.latitude, 
-        locationObj.longitude
-      );
-      
-      if (locationDetails) {
-        this.currentLocationObj = locationDetails;
-        console.log('Fetched location details:', locationDetails);
-        
-        this.setState({
-          locationName: locationDetails.formatted_address,
-          currentLocationObj: locationDetails,
-          isInitialLoad: false,
-          isLoading: false
-        });
+      // Only fetch geocode details if we don't already have them
+      if (!this.currentLocationObj.formatted_address || Platform.OS === 'ios') {
+        const locationDetails = await this.geoCoder.getPlaceFromCordinate(
+          locationObj.latitude,
+          locationObj.longitude
+        );
+
+        if (locationDetails) {
+          this.currentLocationObj = locationDetails;
+          console.log('Fetched location details:', locationDetails);
+
+          this.setState({
+            locationName: locationDetails.formatted_address,
+            currentLocationObj: locationDetails,
+            isInitialLoad: false,
+            isLoading: false
+          });
+        }
       }
+    } catch (error) {
+      console.error('Error getting location details:', error);
+      this.setState({
+        isLoading: false,
+        isInitialLoad: false
+      });
     }
-  } catch (error) {
-    console.error('Error getting location details:', error);
-    this.setState({
-      isLoading: false,
-      isInitialLoad: false
-    });
-  }
-};
+  };
 
 
   isInRadius = (isInRadius) => { };
@@ -3299,7 +3330,7 @@ getLoctionObj = async (locationObj) => {
             isInRadiusOrNot={(isInRadius) => this.isInRadius(isInRadius)}
             isInitialLoad={this.state.isInitialLoad}
           />
-          
+
           {/* <Loader loading={isLoading} /> */}
           {this.renderRegistrationSuccessPopup()}
           {this.renderCamera()}
@@ -3342,13 +3373,13 @@ getLoctionObj = async (locationObj) => {
               >
                 <Icon name="angle-left" size={30} color="white" />
               </TouchableOpacity>
-              
+
               <View style={{ marginTop: 40, flex: 1, alignSelf: "center" }}>
-                <Text style={{  marginBottom: 30,fontSize: 20,fontWeight: "700", color:"#ffff"}}>Checkin</Text>
+                <Text style={{ marginBottom: 30, fontSize: 20, fontWeight: "700", color: "#ffff" }}>Checkin</Text>
               </View>
               <View style={{ marginTop: 40, flex: 1 }}></View>
             </View>
-            
+
           </LinearGradient>
 
           <LinearGradient
@@ -3357,56 +3388,56 @@ getLoctionObj = async (locationObj) => {
             colors={this.getNavigationColor()}
           >
 
-            
-          </LinearGradient>
-          
-<Tab.Navigator
-  style={{ marginTop: -30 }}
-  initialRouteName="Place"
-  screenOptions={{
-    swipeEnabled: true,
-    tabBarStyle: {
-      backgroundColor: "#e0e0e0", // ← Light Grey
-    },
-    tabBarLabelStyle: {
-      fontSize: 20,
-      fontWeight: "bold",
-      color: "black",
-    },
-    tabBarIndicatorStyle: {
-      backgroundColor: "black",
-    },
-  }}
-  screenListeners={{
-    state: (e) => {
-      const routeName = e.data.state.routes[e.data.state.index].name;
-      this.onTabChange(routeName);
-    },
-  }}
->
 
-              
-              
-              <Tab.Screen name="Job">
-                {() => <JobTab parent={this} />}
-              </Tab.Screen>
-              <Tab.Screen name="Case">
-                {() => <CaseTab parent={this} />}
-              </Tab.Screen>
-              <Tab.Screen name="Place">
-                {() => (
-                  <ScrollView
-                    contentContainerStyle={{ flexGrow: 1, paddingBottom: 60, backgroundColor:"white" }}
-                  >
-                    <PlaceTab parent={this} />
-                    {this.renderTeamsView()}
-                  </ScrollView>
-                )}
-              </Tab.Screen>
+          </LinearGradient>
+
+          <Tab.Navigator
+            style={{ marginTop: -30 }}
+            initialRouteName="Place"
+            screenOptions={{
+              swipeEnabled: true,
+              tabBarStyle: {
+                backgroundColor: "#e0e0e0", // ← Light Grey
+              },
+              tabBarLabelStyle: {
+                fontSize: 20,
+                fontWeight: "bold",
+                color: "black",
+              },
+              tabBarIndicatorStyle: {
+                backgroundColor: "black",
+              },
+            }}
+            screenListeners={{
+              state: (e) => {
+                const routeName = e.data.state.routes[e.data.state.index].name;
+                this.onTabChange(routeName);
+              },
+            }}
+          >
+
+
+
+            <Tab.Screen name="Job">
+              {() => <JobTab parent={this} />}
+            </Tab.Screen>
+            <Tab.Screen name="Case">
+              {() => <CaseTab parent={this} />}
+            </Tab.Screen>
+            <Tab.Screen name="Place">
+              {() => (
+                <ScrollView
+                  contentContainerStyle={{ flexGrow: 1, paddingBottom: 60, backgroundColor: "white" }}
+                >
+                  <PlaceTab parent={this} />
+                  {this.renderTeamsView()}
+                </ScrollView>
+              )}
+            </Tab.Screen>
           </Tab.Navigator>
 
 
-          
+
           <View style={{ flexDirection: "row", marginHorizontal: 24 }}>
             {findProjectDetails === null && selectedTab == 0 ? (
               <View
