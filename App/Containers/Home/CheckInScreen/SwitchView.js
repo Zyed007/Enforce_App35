@@ -3,6 +3,7 @@ import {
   Text,
   View,
   Switch,
+  TouchableOpacity
 } from "react-native";
 import styles from "./style";
 import { RadioButton } from "react-native-paper";
@@ -129,45 +130,59 @@ const OfficeAndWfhView = ({
   isWorkFromHome,
 }) => {
   return (
-    <View style={{ flexDirection: "row", marginTop: 30, height: 60 }}>
-      <View
+    <View style={{ flexDirection: 'row', marginTop: 30, height: 60 }}>
+      {/* Office Option */}
+      <TouchableOpacity
         style={{
-          flexDirection: "row",
-          backgroundColor: "#DCDCDC",
+          flexDirection: 'row',
+          backgroundColor: isOffice ? '#e1f5ee' : '#DCDCDC',
           padding: 10,
           borderRadius: 20,
-          justifyContent: "center",
           height: 40,
-          alignItems: "center",
+          alignItems: 'center',
+          borderWidth: isOffice ? 1 : 0,
+          borderColor: '#229b6f',
         }}
+        onPress={onChooseOffice}
       >
-        <Text style={[styles.teamText, { color: "grey" }]}>Office</Text>
-        <RadioButton
-          color="#229b6f"
-          status={isOffice ? "checked" : "unchecked"}
-          onPress={onChooseOffice}
-        />
-      </View>
-      <View
+        <Text style={[styles.teamText, { color: isOffice ? '#229b6f' : 'grey' }]}>
+          Office
+        </Text>
+        <View style={{ marginLeft: 8 }}>
+          <RadioButton.Android
+            color="#229b6f"
+            status={isOffice ? 'checked' : 'unchecked'}
+            onPress={onChooseOffice}
+          />
+        </View>
+      </TouchableOpacity>
+
+      {/* WFH Option */}
+      <TouchableOpacity
         style={{
-          flexDirection: "row",
+          flexDirection: 'row',
           marginLeft: 20,
-          backgroundColor: "#DCDCDC",
+          backgroundColor: isWorkFromHome ? '#e1f5ee' : '#DCDCDC',
           padding: 10,
           borderRadius: 20,
-          justifyContent: "center",
           height: 40,
-          justifyContent: "flex-start",
-          alignItems: "center",
+          alignItems: 'center',
+          borderWidth: isWorkFromHome ? 1 : 0,
+          borderColor: '#229b6f',
         }}
+        onPress={onChooseWrkFromHome}
       >
-        <Text style={[styles.teamText, { color: "grey" }]}>WFH</Text>
-        <RadioButton
-          color="#229b6f"
-          status={isWorkFromHome ? "checked" : "unchecked"}
-          onPress={onChooseWrkFromHome}
-        />
-      </View>
+        <Text style={[styles.teamText, { color: isWorkFromHome ? '#229b6f' : 'grey' }]}>
+          WFH
+        </Text>
+        <View style={{ marginLeft: 8 }}>
+          <RadioButton.Android
+            color="#229b6f"
+            status={isWorkFromHome ? 'checked' : 'unchecked'}
+            onPress={onChooseWrkFromHome}
+          />
+        </View>
+      </TouchableOpacity>
     </View>
   );
 };
