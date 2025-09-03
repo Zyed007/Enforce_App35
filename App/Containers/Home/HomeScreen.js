@@ -10,6 +10,8 @@ import {
   DeviceEventEmitter,
   Linking,
   Alert,
+  AppState,
+  PermissionsAndroid
 } from "react-native";
 import styles from "./style";
 import { Helpers, Images, Metrics } from "../../Theme";
@@ -21,6 +23,7 @@ import { any, string } from "prop-types";
 import { apiService } from "../../Services/ApiService";
 import { Endpoint, BaseUrl } from "../../Services/Endpoint";
 import { Marker } from "react-native-maps";
+import { CommonActions } from "@react-navigation/native";
 // import Geolocation from '@react-native-community/geolocation';
 import {
   getData,
@@ -97,7 +100,9 @@ export default class HomeScreen extends React.Component {
       in_longitude: 0,
       location_value: "",
       location_value_lat: "",
-      location_value_lon: ""
+      location_value_lon: "",
+      loadingMessage: null,
+      appState: AppState.currentState
     };
     this.parentRef = React.createRef();
     this.previousTimeStamp = new Date();
@@ -141,6 +146,9 @@ export default class HomeScreen extends React.Component {
    * Get last check in details by employee ID
    */
   async componentDidMount() {
+  // Add app state listener (NEW API)
+  this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
+
     this.getEmployeeDetails();
     this.lastCheckinByEmpID(true);
     this.geoCoder.initiaLizeGeoCoder();
@@ -169,6 +177,9 @@ export default class HomeScreen extends React.Component {
     }
   }
   componentWillUnmount() {
+    // Remove app state listener
+    AppState.removeEventListener('change', this.handleAppStateChange);
+    
     clearInterval(this.timerCheckIn);
     clearInterval(this.timerBreakIn);
   }
@@ -531,7 +542,7 @@ forceCheckOut = async (isEndOfWork = false) => {
     const checkInDetails = await getData(LocalDBItems.CHECK_IN_OUT_DETAILS);
     let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
   
-    this.setState({ loading: true });
+    this.setState({ loading: true, loadingMessage: null });
   
     let forceCheckoutTime;
     if (value === 'Forgot to Checkout') {
@@ -568,6 +579,8 @@ forceCheckOut = async (isEndOfWork = false) => {
         country: this.currentLocationObj.country,
       },
     };
+
+    console.log("Params for forceCheckOut", params);
   
     await storeData(LocalDBItems.checkOutLocationInfo, this.currentLocationObj);
   
@@ -1537,8 +1550,12 @@ navigateToAuthScreen = async () => {
   console.log("Setting auth flag..."); // Debug
   await storeData(LocalDBItems.isUserAuthenticated, false);
   
-  console.log("Navigating to Auth..."); // Debug
-  NavigationService.navigateAndReset("Auth", {});
+  this.props.navigation.dispatch(
+    CommonActions.reset({
+      index: 0,
+      routes: [{ name: "Auth" }],  // Make sure "Auth" is defined in your navigator
+    })
+  );
 };
 
   renderCheckBreakButton() {
@@ -1666,12 +1683,24 @@ navigateToAuthScreen = async () => {
 
   }
   modalCheckOut = () => {
-    this.postCheckout();
+  // Close modal immediately for better UX
+  this.setState({ 
+    showAlertPopup: false, 
+    isCheckOutPopup: false 
+  }, () => {
+    // Then start checkout process
+    this.postCheckout(false);
+  });
   };
 
   modalEndOfWork = async () => {
+  this.setState({ 
+    showAlertPopup: false, 
+    isCheckOutPopup: false 
+  }, async () => {
     await this.resetTracking();
     this.postCheckout(true);
+  });
   };
 
   modalLogout = () => {
@@ -1703,7 +1732,8 @@ navigateToAuthScreen = async () => {
         {
           text: "OK",
           onPress: () => {
-            this.setState({ showAlertPopup: true, isCheckOutPopup: false });
+            this.setState({  isCheckOutPopup: false });
+            this.navigateToAuthScreen();
           },
           style: 'default',
         },
@@ -1713,7 +1743,10 @@ navigateToAuthScreen = async () => {
         },
       ])
     } else {
-      this.setState({ showAlertPopup: true, isCheckOutPopup: false });
+     if(this.setState({ showAlertPopup: true, isCheckOutPopup: false })){
+      this.navigateToAuthScreen();
+
+     }
     }
   };
 
