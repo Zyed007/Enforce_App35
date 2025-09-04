@@ -729,28 +729,30 @@ export default class CheckInScreen extends React.Component {
 flushtimer = () => {
   addLog("Start button clicked - Bypassing face verification");
   
-  // Check location validity
-  if (!this.hasValidLocation()) {
-    addLog("Location validation failed");
-    Alert.alert('Location Error', 'Valid location is required');
-    return;
-  }
+  // // Check location validity
+  // if (!this.hasValidLocation()) {
+  //   addLog("Location validation failed");
+  //   Alert.alert('Location Error', 'Valid location is required');
+  //   return;
+  // }
 
-  // If it's office check-in, verify radius
-  if (this.state.isOffice) {
-    this.locationFetcher.isLocationInRadius().then(isInRadius => {
-      if (!isInRadius) {
-        Alert.alert('Location Mismatch', 'You must be within office premises');
-        return;
-      }
-      this.proceedWithCheckIn();
-    }).catch(error => {
-      console.error('Radius check failed:', error);
-      Alert.alert('Error', 'Failed to verify location');
-    });
-  } else {
-    this.proceedWithCheckIn();
-  }
+  // // If it's office check-in, verify radius
+  // if (this.state.isOffice) {
+  //   this.locationFetcher.isLocationInRadius().then(isInRadius => {
+  //     if (!isInRadius) {
+  //       Alert.alert('Location Mismatch', 'You must be within office premises');
+  //       return;
+  //     }
+  //     this.proceedWithCheckIn();
+  //   }).catch(error => {
+  //     console.error('Radius check failed:', error);
+  //     Alert.alert('Error', 'Failed to verify location');
+  //   });
+  // } else {
+  //   this.proceedWithCheckIn();
+  // }
+
+  this.verifyFaceRekcongition();
 };
 
 proceedWithCheckIn = () => {

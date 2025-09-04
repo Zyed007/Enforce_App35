@@ -10,6 +10,7 @@ import RNFS from 'react-native-fs';
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import Loader from "../../../Components/Loader";
 import { useNavigation } from '@react-navigation/native';
+import { Image as CompressorImage } from 'react-native-compressor'; 
 
 const FaceRecognitionCamera = forwardRef(({ onPhotoTaken, onDismiss, navigation, onTakeErrorPicture }, ref) => {
   const cameraRef = useRef(null);
@@ -54,33 +55,40 @@ const FaceRecognitionCamera = forwardRef(({ onPhotoTaken, onDismiss, navigation,
     
   }
 
-  const capturePhoto = async () => {
-    try {
-      if (!cameraRef.current) return;
-      
-      setIsLoading(true);
-      setIsActive(false);
+const capturePhoto = async () => {
+  try {
+    if (!cameraRef.current) return;
 
-      const photo = await cameraRef.current.takePhoto({
-        qualityPrioritization: 'speed',
-        flash: 'off',
-        skipMetadata: true,
-      });
+    setIsLoading(true);
+    setIsActive(false);
 
-      const base64 = await RNFS.readFile(photo.path, 'base64');
-      setCapturedPhoto(`data:image/jpeg;base64,${base64}`);
-      
-      // Pass the photo back to parent component
-      await onPhotoTaken(base64);
-      
-    } catch (error) {
-      console.error('Capture error:', error);
-      Alert.alert('Error', 'Failed to capture photo');
-      navigation.goBack();
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    const photo = await cameraRef.current.takePhoto({
+      qualityPrioritization: 'speed',
+      flash: 'off',
+      skipMetadata: true,
+    });
+
+    // 🔽 Compress the image before converting to base64
+    const compressedPath = await CompressorImage.compress(photo.path, {
+      maxWidth: 800,     // resize width
+      quality: 0.6,      // 0–1 scale
+    });
+
+    // Convert compressed image to base64
+    const base64 = await RNFS.readFile(compressedPath, 'base64');
+    setCapturedPhoto(`data:image/jpeg;base64,${base64}`);
+
+    // Send optimized base64 back to parent
+    await onPhotoTaken(base64);
+
+  } catch (error) {
+    console.error('Capture error:', error);
+    Alert.alert('Error', 'Failed to capture photo');
+    navigation.goBack();
+  } finally {
+    setIsLoading(false);
+  }
+};
 
 
   // Expose methods to parent component

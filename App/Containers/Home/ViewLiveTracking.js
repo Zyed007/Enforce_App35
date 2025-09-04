@@ -101,14 +101,13 @@ export default class ViewLiveTrackingScreen extends React.Component {
         this.logErrorToApi(errorType, errorMessage);
       },
       {
-        accuracy: {
-          android: 'high',
-          ios: 'best',
-        },
+       accuracy: { ios: 'bestForNavigation', android: 'high' },
         enableHighAccuracy: true,
-        distanceFilter: 25, // Update every 25 meters
-        interval: 5000, // Check every 5 seconds (5000 ms) to conserve battery
-        fastestInterval: 1000, // Allow updates as fast as 1 second (1000 ms) if available
+        distanceFilter: 25,
+        interval: 5000,
+        fastestInterval: 1000,
+        showsBackgroundLocationIndicator: true, // iOS shows blue bar when tracking
+        useSignificantChanges: false,           // set true if you want less battery drain
       },
     );
   };
