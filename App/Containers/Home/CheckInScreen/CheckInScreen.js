@@ -103,11 +103,11 @@ export default class CheckInScreen extends React.Component {
     this.dismissAndGoBack = this.dismissAndGoBack.bind(this);
 
 
-    const initialLocation = props.route.params?.locationDetails || {
-      formatted_address: '',
-      latitude: 0,
-      longitude: 0
-    };
+    // const initialLocation = props.route.params?.locationDetails || {
+    //   formatted_address: '',
+    //   latitude: 0,
+    //   longitude: 0
+    // };
     this.state = {
       showCameraLoader: false,  // Controls loader visibility
       cameraReady: false,      // Tracks camera readiness
@@ -151,8 +151,8 @@ export default class CheckInScreen extends React.Component {
         latitudeDelta: 0,
         longitudeDelta: 0,
       }),
-      locationName: initialLocation.formatted_address,
-      currentLocationObj: initialLocation,
+      locationName: this.props.route.params.locationDetails,
+      // currentLocationObj: initialLocation,
       locationDataInfo: this.props.route.params.locationDetails,
       manulLocation: "",
       teamId: [],
@@ -187,8 +187,7 @@ export default class CheckInScreen extends React.Component {
       getSelectedProjectData: {},
       isViewDecription: false,
       isLoading: true,
-      faceReportPopup: false,
-      locationName: initialLocation.formatted_address,
+      faceReportPopup: false
     };
     this.dismissAndGoBack = this.dismissAndGoBack.bind(this);
 
@@ -205,6 +204,18 @@ export default class CheckInScreen extends React.Component {
         latitude: LATITUDE,
         longitude: LONGITUDE,
       });
+      this.currentLocationObj = {
+      formatted_address: "",
+      street_number: "",
+      country: "",
+      administrative_area_level_1: "",
+      administrative_area_level_2: "",
+      locality: "",
+      route: "",
+      postal_code: "",
+      latitude: 0.0,
+      longitude: 0.0,
+    };
     (this.isProject = false), this.controller;
     this.scrollView;
     (this.geoCoder = new GeoCoder()),
@@ -216,153 +227,80 @@ export default class CheckInScreen extends React.Component {
     this.isAllowtocheckin = false;
   }
   // Modify componentDidMount to properly handle iOS permissions
-  async componentDidMount() {
-    try {
-      counter_face_data = 0;
-
-      // Initialize with default location values
-      this.currentLocationObj = {
-        formatted_address: '',
-        latitude: 0,
-        longitude: 0,
-        street_number: '',
-        route: '',
-        locality: '',
-        administrative_area_level_2: '',
-        administrative_area_level_1: '',
-        postal_code: '',
-        country: ''
-      };
-
-      // 1. First try to use passed location data if available
-      const { cordinateObj, locationDetails } = this.props.route.params || {};
-      if (cordinateObj && locationDetails) {
-        console.log('[Location] Using passed location:', {
-          lat: cordinateObj.latitude,
-          lng: cordinateObj.longitude,
-          address: locationDetails.formatted_address
-        });
-
-        this.cordinateObj = {
-          latitude: cordinateObj.latitude,
-          longitude: cordinateObj.longitude
-        };
-
-        this.currentLocationObj = {
-          ...locationDetails, // Use all passed location details
-          latitude: cordinateObj.latitude,
-          longitude: cordinateObj.longitude
-        };
-
-        this.setState({
-          locationName: locationDetails.formatted_address || 'Current Location',
-          isInitialLoad: false
-        });
-      }
-
-      // 2. Initialize geocoder early
-      console.log('[Init] Initializing geocoder...');
-      await this.geoCoder.initiaLizeGeoCoder();
-
-      // 3. If no passed location or on iOS, get fresh location
-      if (!cordinateObj || Platform.OS === 'ios') {
-        try {
-          console.log('[Location] Requesting fresh location...');
-          const status = await check(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-
-          if (status !== RESULTS.GRANTED) {
-            const newStatus = await request(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE);
-            if (newStatus !== RESULTS.GRANTED) {
-              throw new Error('Location permission denied');
-            }
-          }
-
-          const position = await new Promise((resolve, reject) => {
-            Geolocation.getCurrentPosition(
-              resolve,
-              reject,
-              {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-              }
-            );
-          });
-
-          console.log('[Location] Got fresh coordinates:', position.coords);
-          this.cordinateObj = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          };
-
-          // Get full address details
-          const freshLocation = await this.geoCoder.getPlaceFromCordinate(
-            position.coords.latitude,
-            position.coords.longitude
-          );
-
-          if (freshLocation) {
-            console.log('[Location] Fresh location details:', freshLocation);
-            this.currentLocationObj = freshLocation;
-            this.setState({
-              locationName: freshLocation.formatted_address,
-              isInitialLoad: false
-            });
-          }
-        } catch (error) {
-          console.warn('[Location] Error getting fresh location:', error);
-          if (!cordinateObj) {
-            Alert.alert(
-              'Location Error',
-              'Could not determine your current location'
-            );
-          }
-        }
-      }
-
-      // 4. Load other essential data
-      console.log('[Init] Loading employee details...');
-      const empDetails = await this.getEmployeeDetails();
-      if (!empDetails) {
-        throw new Error('Failed to load employee details');
-      }
-
-      console.log('[Init] Fetching project data...');
-      await this.fetchAllProjectByOrgID();
-
-      console.log('[Init] Getting UUID...');
-      this.UUID = await getUUID();
-
-      console.log('[Init] Starting error timer...');
-      this.errortimer();
-
-      // 5. Set up navigation listener
-      this._unsubscribe = this.props.navigation.addListener("blur", () => {
-        console.log('[Cleanup] Removing location listeners...');
-        if (this.locationFetcher) {
-          this.locationFetcher.removeListners();
-        }
-        if (this.locationTimeout) {
-          clearTimeout(this.locationTimeout);
-        }
-      });
-
-      console.log('[Init] CheckInScreen mounted successfully');
-      console.log('[Init] Final location state:', {
-        coords: this.cordinateObj,
-        address: this.currentLocationObj.formatted_address
-      });
-
-    } catch (error) {
-      console.error('[Init] Initialization failed:', error);
-      this.setState({ isLoading: false });
-      Alert.alert(
-        'Error',
-        'Failed to initialize check-in. Please try again.'
-      );
-      this.props.navigation.goBack();
-    }
+async componentDidMount() {
+  counter_face_data = 0;
+  const { navigation } = this.props;
+  var locationObj = this.props.route.params.cordinateObj;
+ 
+  if (locationObj) {
+    this.cordinateObj.latitude = locationObj.latitude;
+    this.cordinateObj.longitude = locationObj.longitude;
   }
+  await this.getEmployeeDetails();
+  await this.fetchAllProjectByOrgID();
+  await this.geoCoder.initiaLizeGeoCoder();
+  this.UUID = await getUUID();
+  this.errortimer();
+ 
+  // iOS-compatible navigation listeners
+  this._unsubscribeBlur = this.props.navigation.addListener("blur", () => {
+    this.handleBlurEvent();
+  });
+  this._unsubscribeFocus = this.props.navigation.addListener("focus", () => {
+    this.handleFocusEvent();
+  });
+  // For iOS, we need to handle the transitionEnd event as well
+  if (Platform.OS === 'ios') {
+    this._unsubscribeTransitionEnd = this.props.navigation.addListener("transitionEnd", ({ data }) => {
+      if (data.closing) {
+        this.handleBlurEvent();
+      }
+    });
+  }
+ 
+  console.log("App Version", version.version);
+ 
+  const checkinInfo = { isOfficeChecin: false, isProjectCheckin: false };
+  await storeData(LocalDBItems.checkInInfo, checkinInfo);
+}
+ 
+// Separate handler methods for better readability and reusability
+handleBlurEvent = () => {
+  if (this.locationFetcher != null) {
+    this.locationFetcher.removeListners();
+    this.locationFetcher.removeLocationUpdate(); // Ensure iOS location updates are stopped
+    this.locationFetcher = null;
+  }
+  this.setState({ isLocationFetcherRequired: false });
+}
+ 
+handleFocusEvent = () => {
+  if (this.state.isLocationFetcherRequired && this.locationFetcher === null) {
+    this.locationFetcher = new LocationFetcher();
+    this.locationFetcher.addListnerForFetching();
+  }
+  this.setState({ isLocationFetcherRequired: true });
+}
+ 
+// Don't forget to cleanup all listeners in componentWillUnmount
+componentWillUnmount() {
+  // Remove all navigation listeners
+  if (this._unsubscribeBlur) {
+    this._unsubscribeBlur();
+  }
+  if (this._unsubscribeFocus) {
+    this._unsubscribeFocus();
+  }
+  if (this._unsubscribeTransitionEnd) {
+    this._unsubscribeTransitionEnd();
+  }
+  // Cleanup location fetcher
+  if (this.locationFetcher != null) {
+    this.locationFetcher.removeListners();
+    this.locationFetcher.removeLocationUpdate();
+    this.locationFetcher = null;
+  }
+}
 
 
   onTabChange = (routeName) => {
@@ -396,12 +334,12 @@ export default class CheckInScreen extends React.Component {
     );
   };
   // Helper method to validate location
-  hasValidLocation = () => {
-    return this.currentLocationObj.latitude !== 0 &&
-      this.currentLocationObj.longitude !== 0 &&
-      this.currentLocationObj.latitude !== undefined &&
-      this.currentLocationObj.longitude !== undefined;
-  };
+  // hasValidLocation = () => {
+  //   return this.currentLocationObj.latitude !== 0 &&
+  //     this.currentLocationObj.longitude !== 0 &&
+  //     this.currentLocationObj.latitude !== undefined &&
+  //     this.currentLocationObj.longitude !== undefined;
+  // };
 
   // animate() {
   //   let progress = 0;
@@ -437,7 +375,7 @@ export default class CheckInScreen extends React.Component {
       }
       this.employeeDetails = { ...employeeDetails, isFaceVerified: false };
       this.timer_error = true;
-      return employeeDetails;
+      //return employeeDetails;
     } catch (error) {
       console.error("Error fetching employee details:", error);
       Alert.alert("Error", "Failed to load employee details");
@@ -727,41 +665,68 @@ export default class CheckInScreen extends React.Component {
   }
 
 flushtimer = () => {
-  addLog("Start button clicked - Bypassing face verification");
-  
-  // // Check location validity
+  addLog("Start button clicked - Skipping face verification (TEST MODE)");
+
   // if (!this.hasValidLocation()) {
-  //   addLog("Location validation failed");
+  //   addLog("❌ Location validation failed");
   //   Alert.alert('Location Error', 'Valid location is required');
   //   return;
   // }
 
-  // // If it's office check-in, verify radius
   // if (this.state.isOffice) {
   //   this.locationFetcher.isLocationInRadius().then(isInRadius => {
   //     if (!isInRadius) {
+  //       addLog("❌ Outside office radius");
   //       Alert.alert('Location Mismatch', 'You must be within office premises');
   //       return;
   //     }
+  //     addLog("✅ Location validation passed - proceeding with check-in");
   //     this.proceedWithCheckIn();
   //   }).catch(error => {
   //     console.error('Radius check failed:', error);
   //     Alert.alert('Error', 'Failed to verify location');
   //   });
   // } else {
+  //   addLog("✅ Non-office check-in - proceeding directly");
   //   this.proceedWithCheckIn();
   // }
 
   this.verifyFaceRekcongition();
 };
 
-proceedWithCheckIn = () => {
-  if (this.state.isForceCheckIn) {
-    this.addTimesheetForceCheckIn();
-  } else {
-    this.addTimesheetCheckIn();
+proceedWithCheckIn = async () => {
+  try {
+    addLog("[CheckIn] Proceeding with check-in...");
+    console.log('on',this.currentLocationObj)
+    console.log(this.isAllowtocheckin, 'allow checkin')
+    console.log(this.state.isOffice,"is Office")
+
+    // Show loader
+    //this.setState({ isLoading: true });
+
+    if (this.state.isForceCheckIn == false) {
+      if(this.state.isOffice){
+        await this.onChoosePlace(true)
+      }
+      if(this.isAllowtocheckin==false && this.state.isOffice){
+        Alert.alert("Office","Your current location isn'nt matched with the office");
+        return;
+      }
+    } else {
+      addLog("[CheckIn] Normal check-in triggered");
+      await this.addTimesheetCheckIn();
+    }
+await storeData(LocalDBItems.locationArrayForTracing, []);
+
+  } catch (error) {
+    console.error("[CheckIn] ❌ Error during check-in:", error);
+    Alert.alert("Check-In Failed", "Something went wrong while checking in. Please try again.");
+  } finally {
+    // Always hide loader
+    this.setState({ isLoading: false });
   }
 };
+
 
 
 
@@ -771,45 +736,44 @@ proceedWithCheckIn = () => {
    * Verify face and show timer
    * @returns
    */
-  verifyFaceRekcongition = async () => {
-    addLog("Starting face verification process");
-
-    this.setState({
-      showCameraLoader: true,
-      cameraReady: false,
-      isVerifyFace: true
-    }, () => {
-      addLog("State updated: Camera loader visible, verification started");
-    });
-
-    try {
-      addLog("Checking location validity");
-      if (!this.hasValidLocation()) {
-        addLog("Location validation failed");
-        this.setState({ showCameraLoader: false });
-        Alert.alert('Location Error', 'Valid location is required');
-        return;
-      }
-
-      if (this.state.isOffice) {
-        addLog("Checking office radius");
-        const isInRadius = await this.locationFetcher.isLocationInRadius();
-        addLog(`Office radius check result: ${isInRadius}`);
-
-        if (!isInRadius) {
-          addLog("Outside office radius");
-          this.setState({ showCameraLoader: false });
-          Alert.alert('Location Mismatch', 'You must be within office premises');
-          return;
-        }
-      }
-
-      addLog("All checks passed - proceeding to camera");
-    } catch (error) {
-      addLog(`Verification failed: ${error.message}`);
-      this.setState({ showCameraLoader: false });
+verifyFaceRekcongition = async () => {
+  this.timer_error = false;
+  if (this.state.isForceCheckIn == false) {
+    if (this.state.isOffice) {
+      await this.onChoosePlaceOffice(true);
     }
-  };
+    if (this.isAllowtocheckin == false && this.state.isOffice) {
+      Alert.alert(
+        "Office",
+        "Your current location isn't matched with the office location"
+      );
+      return;
+    }
+  }
+  if (this.state.isWorkFromHome && this.currentLocationObj.formatted_address == "") {
+    Alert.alert(
+      "Work from home",
+      "Unable to fetch current location"
+    );
+    return;
+  }
+ 
+  if (this.state.isManual && this.currentLocationObj.formatted_address === "") {
+    Alert.alert("Error", "Enter reason or location");
+    return;
+  }
+  const isHaveLocation = this.getLocationAddressForPlace()
+  if (isHaveLocation === '') {
+    Alert.alert("Error", "Location couldn't able to fetch location");
+    return
+  }
+  // BYPASS FACE VERIFICATION AND DIRECTLY PROCEED TO CHECKIN
+  if (this.state.isForceCheckIn == true) {
+    this.addTimesheetForceCheckIn();
+  } else {
+    this.addTimesheetCheckIn();
+  }
+};
 
 
   handleSubmission = async () => {
@@ -1046,20 +1010,23 @@ proceedWithCheckIn = () => {
         checkIsInRadius = await this.locationFetcher.isLocationInRadius();
       }
 
-      const {
-        manulLocation,
-        getSelectedProjectData,
-        selectedTab,
-        teamId,
-        teamMemberEmpId,
-        isOffice,
-        isWorkFromHome,
-        isManual,
-        organisationDetails,
-      } = this.state;
-
-      const employeeDetails = await getData(LocalDBItems.employeeDetails);
-      const locationtracking = await getData(LocalDBItems.isEmployeeLocationTrack);
+     const {
+      manulLocation,
+      getSelectedProjectData,
+      selectedTab,
+      teamId,
+      locationName,
+      teamMemberEmpId,
+      manualAddress,
+      isOffice,
+      isWorkFromHome,
+      isManual,
+      wfhAddress,
+      organisationDetails,
+    } = this.state;
+    const employeeDetails = await getData(LocalDBItems.employeeDetails);
+    const locationtracking = await getData(LocalDBItems.isEmployeeLocationTrack)
+    console.log("Location tracking", locationtracking)
 
       // Prepare view models based on check-in type
       let timesheetSearchLocationViewModel = {};
@@ -1179,6 +1146,8 @@ proceedWithCheckIn = () => {
         this.state.isOffice = false;
       }
 
+       console.log('[LocationTracking] Preparing check-in payload with location:', this.currentLocationObj);
+
       // Prepare parameters for API call
       const params = {
         team_member_empid: teamMemberEmpId,
@@ -1206,6 +1175,7 @@ proceedWithCheckIn = () => {
           country: this.currentLocationObj.country,
         },
       };
+      console.log('[LocationTracking] Check-in data fetched for tracking:', params);
 
       // Make API call
       const requestObj = {
@@ -1216,7 +1186,34 @@ proceedWithCheckIn = () => {
 
       const apiResponseData = await apiService(requestObj);
 
+       console.log('[LocationTracking] Check-in API response:', apiResponseData);
+
+      //  console.log("FULL apiResponseData:", apiResponseData);
+
       if (apiResponseData.status == "200") {
+        console.log('[LocationTracking] ✅ Check-in successful. Enabling location tracking...');
+
+        await storeData(LocalDBItems.locationArrayForTracing, []);
+
+        const data = apiResponseData?.data ? apiResponseData.data : apiResponseData;
+console.log("THIS IS apiResponseData:", data);
+
+const checkInDetails = {
+  checkin_formatted_address: this.currentLocationObj.formatted_address || "",
+  checkin_lat: this.currentLocationObj.latitude || 0.0,
+  checkin_lang: this.currentLocationObj.longitude || 0.0,
+  checkin_street_number: this.currentLocationObj.street_number || "",
+  checkin_route: this.currentLocationObj.route || "",
+  checkin_locality: this.currentLocationObj.locality || "",
+  checkin_administrative_area_level_2: this.currentLocationObj.administrative_area_level_2 || "",
+  checkin_administrative_area_level_1: this.currentLocationObj.administrative_area_level_1 || "",
+  checkin_project: this.currentLocationObj.project || "",
+  checkin_jobType: this.currentLocationObj.jobType || "",
+};
+
+  await storeData(LocalDBItems.checkInLocationInfo, checkInDetails);
+
+  console.log("[CheckIn] ✅ Stored check-in details:", checkInDetails);
         // Clear any existing timers
         if (this.timer != null) {
           clearInterval(this.timer);
@@ -1232,15 +1229,17 @@ proceedWithCheckIn = () => {
           isProjectCheckin: this.isProject,
         };
 
-        await storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData);
-        await storeData(LocalDBItems.checkInInfo, checkinInfo);
+         storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData);
+         storeData(LocalDBItems.checkInInfo, checkinInfo);
 
         // Handle location tracking
-        if (locationtracking) {
-          await storeData(LocalDBItems.isEmployeeLocationTrack, true);
+        if (locationtracking==false) {
+          console.log("Location tracking is false")
+           storeData(LocalDBItems.isEmployeeLocationTrack, false);
+           this.locationFetcher.removeLocationUpdate();
         } else {
-          await storeData(LocalDBItems.isEmployeeLocationTrack, false);
-          this.locationFetcher.removeLocationUpdate();
+          console.log("Location tracking started");
+           storeData(LocalDBItems.isEmployeeLocationTrack, true);
         }
 
         // Navigate to HomeScreen with refresh parameters
@@ -1252,6 +1251,7 @@ proceedWithCheckIn = () => {
         });
 
         // Show success message
+        const employeeDetails= await getData(LocalDBItems.employeeDetails);
         const full_name = `${employeeDetails.full_name} checked in successfully`;
         Toast.show(full_name, Toast.LONG);
       } else {
@@ -1262,10 +1262,10 @@ proceedWithCheckIn = () => {
       Toast.show(error.message || "Check-in failed", Toast.LONG);
 
       // Re-enable UI elements if needed
-      this.setState({
-        showCameraLoader: false,
-        isVerifyFace: false
-      });
+      // this.setState({
+      //   showCameraLoader: false,
+      //   isVerifyFace: false
+      // });
     }
   };
 
@@ -3467,7 +3467,7 @@ proceedWithCheckIn = () => {
                   justifyContent: "center",
                   alignSelf: "center",
                 }}
-                onPress={() => this.flushtimer()}
+                onPress={() => this.verifyFaceRekcongition()}
               >
                 <LinearGradient
                   start={{ x: 0.5, y: 1.0 }}

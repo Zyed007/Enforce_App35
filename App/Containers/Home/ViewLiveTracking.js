@@ -72,6 +72,7 @@ export default class ViewLiveTrackingScreen extends React.Component {
 
         const isTracking = await getData(LocalDBItems.isLocationTrackingNeeded);
         if (isTracking) {
+          console.log('[LiveTracking] Tracking enabled. Collecting location...');
           this.handleLocationTracking(location);
         }
       },
@@ -107,7 +108,7 @@ export default class ViewLiveTrackingScreen extends React.Component {
         interval: 5000,
         fastestInterval: 1000,
         showsBackgroundLocationIndicator: true, // iOS shows blue bar when tracking
-        useSignificantChanges: false,           // set true if you want less battery drain
+       // useSignificantChanges: false,           // set true if you want less battery drain
       },
     );
   };
@@ -129,11 +130,44 @@ export default class ViewLiveTrackingScreen extends React.Component {
    * Sets the location array to plot it on the map
    * `syncLocationToApi` method called to sync the location to the server
    */
+//   handleLocationTracking = async (location) => {
+//      const timestamp = new Date().toISOString();
+//  const locationPoint = {
+//     latitude: location.latitude,
+//     longitude: location.longitude,
+//     created_date: new Date().toISOString(),
+//   };
+
+//   this.locationInfoArray.push(locationPoint);
+//   console.log("[LiveTracking] 📍 New location collected:", locationPoint);
+//   console.log("[LiveTracking] Total collected points:", this.locationInfoArray.length);
+
+
+
+
+//     // Always store the accumulated data to local storage for persistence across app restarts
+//     await storeData(LocalDBItems.locationArrayForTracing, this.locationInfoArray);
+//   console.log("[LiveTracking] 💾 Saved to LocalDB (locationArrayForTracing). Current size:", this.locationInfoArray.length);
+
+//     if (this.mapRef) {
+//       this.mapRef.trackLocationOnMap(location);
+//     } 
+    
+//     if (!this.lastSyncTime) {
+//     console.log("[LiveTracking] 🚀 First location — syncing immediately...");
+//     await this.locationTrackingNewApi();
+//     this.lastSyncTime = Date.now();
+//   } else {
+//     // For later locations → follow normal 2 min rule
+//     this.syncLocationToApi();
+//   }
+//   };
+
   handleLocationTracking = async (location) => {
     this.locationInfoArray.push(location);
     // Always store the accumulated data to local storage for persistence across app restarts
     await storeData(LocalDBItems.locationArrayForTracing, this.locationInfoArray);
-
+ 
     if (this.mapRef) {
       this.mapRef.trackLocationOnMap(location);
     }
@@ -146,17 +180,27 @@ export default class ViewLiveTrackingScreen extends React.Component {
    * Check the time difference
    * If it's greater than 2 mins then location will be sent to the server
    */
-  syncLocationToApi = async () => {
-    const isTracking = await getData(LocalDBItems.isLocationTrackingNeeded);
-    if (isTracking && !this.state.isSyncing) { // Prevent multiple simultaneous syncs
-      const difference = (new Date().getTime() - this.previousTimeStamp.getTime()) / 1000;
-      if (difference > 2 * 60 && this.locationInfoArray.length > 0) { // Sync every 2 minutes if there's data
-        this.setState({ isSyncing: true, showTrackingStatus: 'Syncing data...' });
-        await this.locationTrackingNewApi();
-        this.setState({ isSyncing: false });
-      }
-    }
-  };
+syncLocationToApi = async () => {
+  console.log("[LiveTracking] 🔄 Checking if it's time to sync...");
+
+  const isTracking = await getData(LocalDBItems.isLocationTrackingNeeded);
+
+  if (isTracking && !this.state.isSyncing) {
+    const difference = (new Date().getTime() - this.previousTimeStamp.getTime()) / 1000;
+    const collectedPoints = this.locationInfoArray.length;
+
+    console.log(`[LiveTracking] ⏱ Time since last sync: ${difference}s | Collected points: ${collectedPoints}`);
+
+    if (difference > 10 && this.locationInfoArray.length > 0) {
+      console.log(`[LiveTracking] 🚀 Triggering sync... Sending ${collectedPoints} points to server.`);
+      this.setState({ isSyncing: true, showTrackingStatus: 'Syncing data...' });
+    await this.locationTrackingNewApi();
+    this.setState({isSyncing: false})
+    console.log("[LiveTracking] ✅ Sync process completed.");
+    } 
+  }
+};
+
 
   /**
    * Method to save the location tracking to the server
@@ -166,87 +210,125 @@ export default class ViewLiveTrackingScreen extends React.Component {
    * Creates the check-in dictionary of the user
    * Posts the parameters to the server
    */
-  locationTrackingNewApi = async (checkInInfo) => {
-    const locationArrayToSend = [...this.locationInfoArray]; // Use a copy to avoid race conditions
-    if (locationArrayToSend.length > 0) {
-      const groupUUID = await this.getRandomUUID();
-      const id = await UUIDGenerator.getRandomUUID();
-      const checkoutLocationInfo = await getData(LocalDBItems.checkOutLocationInfo);
-      const employeeDetails = await getData(LocalDBItems.employeeDetails);
-      const distance = getPathLength(locationArrayToSend) / 1000;
-      const date = new Date();
+locationTrackingNewApi = async (checkInInfo) => {
+  console.log("[LiveTracking] 🚀 Starting sync process...");
 
-      const newLocationArrayMapped = locationArrayToSend.map((locationItem) => {
-        return {
-          groupid: groupUUID,
-          lat: locationItem.latitude,
-          lang: locationItem.longitude,
-          created_date: date,
-        };
-      });
+  const locationArrayToSend = [...this.locationInfoArray];
 
-      let checkInDict = {};
-      // Prioritize checkInInfo passed as argument, otherwise use prop
-      if (checkInInfo) {
-        checkInDict = checkInInfo;
-      } else if (this.props.checkinDict) {
-        checkInDict = this.props.checkinDict;
-      }
-      // If checkInDict is still empty, it means no check-in info is available or passed.
-      // You might want to handle this case (e.g., provide default empty values or show a warning).
+  if (locationArrayToSend.length > 0) {
+    console.log(
+      `[LiveTracking] 📍 Preparing to send ${locationArrayToSend.length} collected points to server.`
+    );
 
-      const dict = {
-        "id": id,
-        "empid": employeeDetails?.id,
-        "groupid": groupUUID,
-        "distance": distance,
-        "checkout_formatted_address": checkoutLocationInfo?.formatted_address || "",
-        "checkout_lat": checkoutLocationInfo?.latitude || 0.0,
-        "checkout_lang": checkoutLocationInfo?.longitude || 0.0,
-        "checkout_street_number": checkoutLocationInfo?.street_number || "",
-        "checkout_route": checkoutLocationInfo?.route || "",
-        "checkout_locality": checkoutLocationInfo?.locality || "",
-        "checkout_administrative_area_level_2": checkoutLocationInfo?.administrative_area_level_2 || "",
-        "checkout_administrative_area_level_1": checkoutLocationInfo?.administrative_area_level_1 || "",
-        "checkin_formatted_address": checkInDict?.checkin_formatted_address || "", // Ensure these are populated from checkInDict
-        "travelClaimTrack": newLocationArrayMapped,
-        "created_date": date,
-        "is_trip_end": this.isTripEnd,
-        "createdby": employeeDetails?.full_name, // This might need to be populated from employeeDetails
-        ...checkInDict // Spread checkInDict to include all its properties
+    const groupUUID = await this.getRandomUUID();
+    const id = await UUIDGenerator.getRandomUUID();
+    const checkoutLocationInfo = await getData(LocalDBItems.checkOutLocationInfo);
+    const employeeDetails = await getData(LocalDBItems.employeeDetails);
+    const distance = getPathLength(locationArrayToSend) / 1000;
+    const date = new Date().toISOString();
+
+    // Format each location point
+    const newLocationArrayMapped = locationArrayToSend.map((locationItem) => {
+      return {
+        groupid: groupUUID,
+        lat: locationItem.latitude,
+        lang: locationItem.longitude,
+        created_date: date,
       };
+    });
 
-      const requestObj = { endpoint: BaseUrl.API_BASE_URL + Endpoint.TIMESHEET_TRAVEL_CLAIM, type: 'post', params: dict };
+    // FIX: Always get check-in details from local storage
+    const storedCheckInInfo = await getData(LocalDBItems.checkInLocationInfo);
+    const safeCheckInDict = storedCheckInInfo ? JSON.parse(JSON.stringify(storedCheckInInfo)) : {};
+    
+    console.log("[LiveTracking] ✅ Using check-in dict:", safeCheckInDict);
 
-      try {
-        const apiResponseData = await apiService(requestObj);
+    // Final payload
+    const dict = {
+      id: id,
+      empid: employeeDetails?.id,
+      groupid: groupUUID,
+      distance: distance,
+      checkout_formatted_address: checkoutLocationInfo?.formatted_address || "",
+      checkout_lat: checkoutLocationInfo?.latitude || 0.0,
+      checkout_lang: checkoutLocationInfo?.longitude || 0.0,
+      checkout_street_number: checkoutLocationInfo?.street_number || "",
+      checkout_route: checkoutLocationInfo?.route || "",
+      checkout_locality: checkoutLocationInfo?.locality || "",
+      checkout_administrative_area_level_2:
+        checkoutLocationInfo?.administrative_area_level_2 || "",
+      checkout_administrative_area_level_1:
+        checkoutLocationInfo?.administrative_area_level_1 || "",
+      created_date: date,
+      is_trip_end: this.isTripEnd,
+      createdby: employeeDetails?.full_name,
+      ...safeCheckInDict, // ✅ Now this will contain the actual check-in data
+      travelClaimTrack: newLocationArrayMapped,
+    };
 
-        if (apiResponseData.status === "200") {
-          // Data successfully stored, now wipe out local data
-          this.previousTimeStamp = new Date();
-          this.locationInfoArray = []; // Clear current session's accumulated data
-          await storeData(LocalDBItems.locationArrayForTracing, []); // Clear persisted data
-          this.setState({ showTrackingStatus: 'Location synced successfully.' });
-        } else {
-          // API call was made, but status indicates an issue
-          console.error("API call failed with status:", apiResponseData.status, "message:", apiResponseData.message);
-          this.setState({ showTrackingStatus: 'Sync failed, retrying later.' });
-          await this.logErrorToApi(
-            "API_CALL_FAILED",
-            `Status: ${apiResponseData.status}, Message: ${apiResponseData.message || 'No specific message'}`
-          );
-        }
-      } catch (error) {
-        // Network error or other issues during API call
-        console.error("Error sending location data:", error);
-        this.setState({ showTrackingStatus: 'Network error, retrying later.' });
-        await this.logErrorToApi("NETWORK_ERROR", error.message || 'Unknown network error');
+
+    console.log("[LiveTracking] Payload keys:", Object.keys(dict));
+
+    const requestObj = {
+      endpoint: BaseUrl.API_BASE_URL + Endpoint.TIMESHEET_TRAVEL_CLAIM,
+      type: "post",
+      params: dict,
+    };
+
+    // Log the payload for debugging
+    console.log("[LiveTracking] 📦 Payload being sent to server:", requestObj);
+
+    try {
+      const apiResponseData = await apiService(requestObj);
+
+      if (apiResponseData.status === "200") {
+        console.log(
+          "[LiveTracking] ✅ Server accepted data. Response:",
+          apiResponseData
+        );
+
+        // Reset buffer after successful sync
+        this.previousTimeStamp = new Date();
+        this.locationInfoArray = [];
+        await storeData(LocalDBItems.locationArrayForTracing, []);
+        console.log("[LiveTracking] 🧹 Cleared local buffer after successful sync.");
+
+        this.setState({ showTrackingStatus: "Location synced successfully." });
+      } else {
+        console.error(
+          "[LiveTracking] ❌ API call failed. Status:",
+          apiResponseData.status,
+          "Message:",
+          apiResponseData.message
+        );
+        this.setState({ showTrackingStatus: "Sync failed, retrying later." });
+
+        await this.logErrorToApi(
+          "API_CALL_FAILED",
+          `Status: ${apiResponseData.status}, Message: ${
+            apiResponseData.message || "No specific message"
+          }`
+        );
       }
-    } else {
-      console.log("No new location data to send.");
-      this.setState({ showTrackingStatus: 'Waiting for location updates...' });
+    } catch (error) {
+      console.error(
+        "[LiveTracking] 🌐 Network/Server error while sending data:",
+        error
+      );
+      this.setState({ showTrackingStatus: "Network error, retrying later." });
+
+      await this.logErrorToApi("NETWORK_ERROR", error.message || "Unknown network error");
     }
-  };
+  } else {
+    console.log(
+      "[LiveTracking] 📭 No new location data to send. Waiting for next collection..."
+    );
+    this.setState({ showTrackingStatus: "Waiting for location updates..." });
+  }
+};
+
+
+
 
   /**
    * Method to log errors to the server.
@@ -299,6 +381,7 @@ export default class ViewLiveTrackingScreen extends React.Component {
    * (This method seems to be for an external listener, not directly used for map plotting here)
    */
   getLocationForTracking = async (locationObj) => {
+    console.log("getLocationForTracking() is called")
     this.cordinateObj.latitude = locationObj.latitude;
     this.cordinateObj.longitude = locationObj.longitude;
     DeviceEventEmitter.emit('locationEvent', locationObj);
