@@ -187,7 +187,8 @@ export default class CheckInScreen extends React.Component {
       getSelectedProjectData: {},
       isViewDecription: false,
       isLoading: true,
-      faceReportPopup: false
+      faceReportPopup: false,
+
     };
     this.dismissAndGoBack = this.dismissAndGoBack.bind(this);
 
@@ -235,11 +236,13 @@ async componentDidMount() {
   if (locationObj) {
     this.cordinateObj.latitude = locationObj.latitude;
     this.cordinateObj.longitude = locationObj.longitude;
-  }
-  await this.getEmployeeDetails();
-  await this.fetchAllProjectByOrgID();
-  await this.geoCoder.initiaLizeGeoCoder();
-  this.UUID = await getUUID();
+      // console.log(locationObj);
+    }
+    this.getEmployeeDetails();
+    this.fetchAllProjectByOrgID();
+    this.geoCoder.initiaLizeGeoCoder();
+    this.UUID = await getUUID()
+    // this.submitReport();
   this.errortimer();
  
   // iOS-compatible navigation listeners
@@ -272,6 +275,11 @@ handleBlurEvent = () => {
     this.locationFetcher = null;
   }
   this.setState({ isLocationFetcherRequired: false });
+
+  console.log("Am here Version", version.version);
+
+    const checkinInfo = { isOfficeChecin: false, isProjectCheckin: false };
+    storeData(LocalDBItems.checkInInfo, checkinInfo);
 }
  
 handleFocusEvent = () => {
@@ -282,25 +290,7 @@ handleFocusEvent = () => {
   this.setState({ isLocationFetcherRequired: true });
 }
  
-// Don't forget to cleanup all listeners in componentWillUnmount
-componentWillUnmount() {
-  // Remove all navigation listeners
-  if (this._unsubscribeBlur) {
-    this._unsubscribeBlur();
-  }
-  if (this._unsubscribeFocus) {
-    this._unsubscribeFocus();
-  }
-  if (this._unsubscribeTransitionEnd) {
-    this._unsubscribeTransitionEnd();
-  }
-  // Cleanup location fetcher
-  if (this.locationFetcher != null) {
-    this.locationFetcher.removeListners();
-    this.locationFetcher.removeLocationUpdate();
-    this.locationFetcher = null;
-  }
-}
+
 
 
   onTabChange = (routeName) => {
@@ -368,20 +358,10 @@ componentWillUnmount() {
    * Get employee details
    */
   getEmployeeDetails = async () => {
-    try {
       const employeeDetails = await getData(LocalDBItems.employeeDetails);
-      if (!employeeDetails) {
-        throw new Error("Employee details not found");
-      }
       this.employeeDetails = { ...employeeDetails, isFaceVerified: false };
       this.timer_error = true;
-      //return employeeDetails;
-    } catch (error) {
-      console.error("Error fetching employee details:", error);
-      Alert.alert("Error", "Failed to load employee details");
-      this.props.navigation.goBack();
-      return null;
-    }
+
   };
 
 
@@ -390,7 +370,7 @@ componentWillUnmount() {
     setTimeout(() => {
       if (this.timer_error == false || this.currentLocationObj != "") {
         console.log("Timer_Error", this.timer_error)
-        console.log("Time", counter)
+        console.log("Tim", counter)
         return;
       }
       else {
@@ -467,25 +447,29 @@ componentWillUnmount() {
   /*For submitting the report of the Face regonossation issue */
   face_report = async () => {
     const employeDetails = await getData(LocalDBItems.employeeDetails);
-    let params = { orgID: employeDetails.org_id };
+    let params = { orgID: employeDetails.org_id }
     const requestObj = {
       endpoint: BaseUrl.API_BASE_URL + Endpoint.GETALL_APPROVAL_DATA,
       type: "patch",
       params: params,
     };
     const apiResponseData = await apiService(requestObj);
+    console.log(apiResponseData);
     const emp_role_id = employeDetails.role_id;
     const section_id_data = apiResponseData.filter(item => item.section_id === '8a55082f-5185-4d28-9098-4f268cb47d51' && item.role_id === emp_role_id);
-
+    console.log("Section_data", section_id_data)
     if (section_id_data.length == 0) {
+
+  
       Alert.alert('Access Denied', 'You are not allowed to do the Face force CheckIn. Please Contact IT team', [
         {
           text: 'OK',
           onPress: () => this.props.navigation.goBack(),
           style: 'cancel'
         },]);
-    } else {
-      console.log("Checkin in the Second area");
+    }
+    else {
+      console.log("Checin in the Second area");
       this.GetAllTimesheetListByEmployeeID();
       this.reason_face = "Face Recognition Issue";
     }
@@ -694,40 +678,6 @@ flushtimer = () => {
   this.verifyFaceRekcongition();
 };
 
-proceedWithCheckIn = async () => {
-  try {
-    addLog("[CheckIn] Proceeding with check-in...");
-    console.log('on',this.currentLocationObj)
-    console.log(this.isAllowtocheckin, 'allow checkin')
-    console.log(this.state.isOffice,"is Office")
-
-    // Show loader
-    //this.setState({ isLoading: true });
-
-    if (this.state.isForceCheckIn == false) {
-      if(this.state.isOffice){
-        await this.onChoosePlace(true)
-      }
-      if(this.isAllowtocheckin==false && this.state.isOffice){
-        Alert.alert("Office","Your current location isn'nt matched with the office");
-        return;
-      }
-    } else {
-      addLog("[CheckIn] Normal check-in triggered");
-      await this.addTimesheetCheckIn();
-    }
-await storeData(LocalDBItems.locationArrayForTracing, []);
-
-  } catch (error) {
-    console.error("[CheckIn] ❌ Error during check-in:", error);
-    Alert.alert("Check-In Failed", "Something went wrong while checking in. Please try again.");
-  } finally {
-    // Always hide loader
-    this.setState({ isLoading: false });
-  }
-};
-
-
 
 
 
@@ -738,11 +688,16 @@ await storeData(LocalDBItems.locationArrayForTracing, []);
    */
 verifyFaceRekcongition = async () => {
   this.timer_error = false;
-  if (this.state.isForceCheckIn == false) {
+  console.log("on", this.currentLocationObj);
+  console.log(this.isAllowtocheckin, "allow checkin");
+  console.log(this.state.isOffice, "is Office");
+
+  // ✅ Basic office validation
+  if (this.state.isForceCheckIn === false) {
     if (this.state.isOffice) {
       await this.onChoosePlaceOffice(true);
     }
-    if (this.isAllowtocheckin == false && this.state.isOffice) {
+    if (this.isAllowtocheckin === false && this.state.isOffice) {
       Alert.alert(
         "Office",
         "Your current location isn't matched with the office location"
@@ -750,27 +705,38 @@ verifyFaceRekcongition = async () => {
       return;
     }
   }
-  if (this.state.isWorkFromHome && this.currentLocationObj.formatted_address == "") {
-    Alert.alert(
-      "Work from home",
-      "Unable to fetch current location"
-    );
+
+  // ✅ Work from home check
+  if (
+    this.state.isWorkFromHome &&
+    this.currentLocationObj.formatted_address === ""
+  ) {
+    Alert.alert("Work from home", "Unable to fetch current location");
     return;
   }
- 
-  if (this.state.isManual && this.currentLocationObj.formatted_address === "") {
+
+  // ✅ Manual check-in validation
+  if (
+    this.state.isManual &&
+    this.currentLocationObj.formatted_address === ""
+  ) {
     Alert.alert("Error", "Enter reason or location");
     return;
   }
-  const isHaveLocation = this.getLocationAddressForPlace()
-  if (isHaveLocation === '') {
-    Alert.alert("Error", "Location couldn't able to fetch location");
-    return
+
+  // ✅ Make sure we have location
+  const isHaveLocation = this.getLocationAddressForPlace();
+  if (isHaveLocation === "") {
+    Alert.alert("Error", "Location couldn't be fetched");
+    return;
   }
-  // BYPASS FACE VERIFICATION AND DIRECTLY PROCEED TO CHECKIN
-  if (this.state.isForceCheckIn == true) {
+
+  // 🚀 BYPASS FACE VERIFICATION AND DIRECTLY PROCEED TO CHECK-IN
+  if (this.state.isForceCheckIn === true) {
+    console.log("Proceeding with Force Check-In");
     this.addTimesheetForceCheckIn();
   } else {
+    console.log("Proceeding with Normal Check-In");
     this.addTimesheetCheckIn();
   }
 };
@@ -1000,17 +966,13 @@ verifyFaceRekcongition = async () => {
   /**
    * Add Time sheet API call after face is verified
    */
-  addTimesheetCheckIn = async () => {
-    try {
-      let UUID = await getUUID();
-      let checkIsInRadius = false;
-
-      // Check office radius if applicable
-      if (this.state.isOffice) {
-        checkIsInRadius = await this.locationFetcher.isLocationInRadius();
-      }
-
-     const {
+addTimesheetCheckIn = async () => {
+    let UUID = await getUUID()
+    let checkIsInRadius = false;
+    if (this.state.isOffice) {
+      checkIsInRadius = await this.locationFetcher.isLocationInRadius();
+    }
+    const {
       manulLocation,
       getSelectedProjectData,
       selectedTab,
@@ -1027,45 +989,96 @@ verifyFaceRekcongition = async () => {
     const employeeDetails = await getData(LocalDBItems.employeeDetails);
     const locationtracking = await getData(LocalDBItems.isEmployeeLocationTrack)
     console.log("Location tracking", locationtracking)
-
-      // Prepare view models based on check-in type
-      let timesheetSearchLocationViewModel = {};
-      let timesheetCategoryViewModel = {};
-
-      if (isOffice) {
-        this.isProject = false;
-        timesheetCategoryViewModel = {
-          project_category_type: "Office",
-          project_or_comp_id: organisationDetails.org_id,
-          project_or_comp_name: organisationDetails.org_name,
-          project_or_comp_type: null,
-        };
-
-        timesheetSearchLocationViewModel = {
-          manual_address: "",
-          geo_address: organisationDetails.entityLocation.geo_address,
-          formatted_address: organisationDetails.entityLocation.formatted_address,
-          lat: organisationDetails.entityLocation.lat,
-          lang: organisationDetails.entityLocation.lang,
-          street_number: organisationDetails.entityLocation.street_number,
-          route: organisationDetails.entityLocation.route,
-          locality: organisationDetails.entityLocation.locality,
-          administrative_area_level_2: organisationDetails.entityLocation.administrative_area_level_2,
-          administrative_area_level_1: organisationDetails.entityLocation.administrative_area_level_1,
-          postal_code: organisationDetails.entityLocation.postal_code,
-          country: organisationDetails.entityLocation.country,
-          is_office: true,
-          is_manual: false,
-          is_wfh: false,
-        };
-      } else if (isWorkFromHome) {
+    var timesheetSearchLocationViewModel = {};
+    var timesheetCategoryViewModel = {};
+    if (isOffice) {
+      this.isProject = false;
+      timesheetCategoryViewModel = {
+        project_category_type: "Office",
+        project_or_comp_id: organisationDetails.org_id,
+        project_or_comp_name: organisationDetails.org_name,
+        project_or_comp_type: null,
+      };
+      timesheetSearchLocationViewModel = {
+        manual_address: "",
+        geo_address: organisationDetails.entityLocation.geo_address,
+        formatted_address: organisationDetails.entityLocation.formatted_address,
+        lat: organisationDetails.entityLocation.lat,
+        lang: organisationDetails.entityLocation.lang,
+        street_number: organisationDetails.entityLocation.street_number,
+        route: organisationDetails.entityLocation.route,
+        locality: organisationDetails.entityLocation.locality,
+        administrative_area_level_2:
+          organisationDetails.entityLocation.administrative_area_level_2,
+        administrative_area_level_1:
+          organisationDetails.entityLocation.administrative_area_level_1,
+        postal_code: organisationDetails.entityLocation.postal_code,
+        country: organisationDetails.entityLocation.country,
+        is_office: true,
+        is_manual: false,
+        is_wfh: false,
+      };
+    } else if (isWorkFromHome) {
+      timesheetCategoryViewModel = {
+        project_category_type: "Place",
+        project_or_comp_id: null,
+        project_or_comp_name: this.currentLocationObj.formatted_address,
+        project_or_comp_type: null,
+      };
+      timesheetSearchLocationViewModel = {
+        manual_address: "",
+        geo_address: this.currentLocationObj.formatted_address,
+        formatted_address: this.currentLocationObj.formatted_address,
+        lat: this.currentLocationObj.latitude,
+        lang: this.currentLocationObj.longitude,
+        street_number: this.currentLocationObj.street_number,
+        route: this.currentLocationObj.route,
+        locality: this.currentLocationObj.locality,
+        administrative_area_level_2: this.currentLocationObj
+          .administrative_area_level_2,
+        administrative_area_level_1: this.currentLocationObj
+          .administrative_area_level_1,
+        postal_code: this.currentLocationObj.postal_code,
+        country: this.currentLocationObj.country,
+        is_office: false,
+        is_manual: false,
+        is_wfh: true,
+      };
+      checkIsInRadius = true;
+    } else if (isManual) {
+      timesheetCategoryViewModel = {
+        project_category_type: "Place",
+        project_or_comp_id: null,
+        project_or_comp_name: manulLocation,
+        project_or_comp_type: null,
+      };
+      timesheetSearchLocationViewModel = {
+        manual_address: manulLocation,
+        geo_address: this.currentLocationObj.formatted_address,
+        formatted_address: this.currentLocationObj.formatted_address,
+        lat: this.currentLocationObj.latitude,
+        lang: this.currentLocationObj.longitude,
+        street_number: this.currentLocationObj.street_number,
+        route: this.currentLocationObj.route,
+        locality: this.currentLocationObj.locality,
+        administrative_area_level_2: this.currentLocationObj
+          .administrative_area_level_2,
+        administrative_area_level_1: this.currentLocationObj
+          .administrative_area_level_1,
+        postal_code: this.currentLocationObj.postal_code,
+        country: this.currentLocationObj.country,
+        is_office: false,
+        is_manual: true,
+        is_wfh: false,
+      };
+    } else {
+      if (this.state.selectedTab === 2) {
         timesheetCategoryViewModel = {
           project_category_type: "Place",
           project_or_comp_id: null,
           project_or_comp_name: this.currentLocationObj.formatted_address,
-          project_or_comp_type: null,
+          project_or_comp_type: "",
         };
-
         timesheetSearchLocationViewModel = {
           manual_address: "",
           geo_address: this.currentLocationObj.formatted_address,
@@ -1075,198 +1088,99 @@ verifyFaceRekcongition = async () => {
           street_number: this.currentLocationObj.street_number,
           route: this.currentLocationObj.route,
           locality: this.currentLocationObj.locality,
-          administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
-          administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
+          administrative_area_level_2: this.currentLocationObj
+            .administrative_area_level_2,
+          administrative_area_level_1: this.currentLocationObj
+            .administrative_area_level_1,
           postal_code: this.currentLocationObj.postal_code,
           country: this.currentLocationObj.country,
           is_office: false,
           is_manual: false,
-          is_wfh: true,
-        };
-        checkIsInRadius = true;
-      } else if (isManual) {
-        timesheetCategoryViewModel = {
-          project_category_type: "Place",
-          project_or_comp_id: null,
-          project_or_comp_name: manulLocation,
-          project_or_comp_type: null,
-        };
-        timesheetSearchLocationViewModel = {
-          manual_address: manulLocation,
-          geo_address: this.currentLocationObj.formatted_address,
-          formatted_address: this.currentLocationObj.formatted_address,
-          lat: this.currentLocationObj.latitude,
-          lang: this.currentLocationObj.longitude,
-          street_number: this.currentLocationObj.street_number,
-          route: this.currentLocationObj.route,
-          locality: this.currentLocationObj.locality,
-          administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
-          administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
-          postal_code: this.currentLocationObj.postal_code,
-          country: this.currentLocationObj.country,
-          is_office: false,
-          is_manual: true,
           is_wfh: false,
         };
       } else {
-        if (this.state.selectedTab === 2) {
-          timesheetCategoryViewModel = {
-            project_category_type: "Place",
-            project_or_comp_id: null,
-            project_or_comp_name: this.currentLocationObj.formatted_address,
-            project_or_comp_type: "",
-          };
-          timesheetSearchLocationViewModel = {
-            manual_address: "",
-            geo_address: this.currentLocationObj.formatted_address,
-            formatted_address: this.currentLocationObj.formatted_address,
-            lat: this.currentLocationObj.latitude,
-            lang: this.currentLocationObj.longitude,
-            street_number: this.currentLocationObj.street_number,
-            route: this.currentLocationObj.route,
-            locality: this.currentLocationObj.locality,
-            administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
-            administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
-            postal_code: this.currentLocationObj.postal_code,
-            country: this.currentLocationObj.country,
-            is_office: false,
-            is_manual: false,
-            is_wfh: false,
-          };
-        } else {
-          timesheetCategoryViewModel = {
-            project_category_type: "Job",
-            project_or_comp_id: getSelectedProjectData.project_id,
-            project_or_comp_name: getSelectedProjectData.project_name,
-            project_or_comp_type: "",
-          };
-          timesheetSearchLocationViewModel = null;
-        }
-        this.isProject = !!getSelectedProjectData.project_id;
-        this.state.isOffice = false;
+        timesheetCategoryViewModel = {
+          project_category_type: "Job",
+          project_or_comp_id: getSelectedProjectData.project_id,
+          project_or_comp_name: getSelectedProjectData.project_name,
+          project_or_comp_type: "",
+        };
+        timesheetSearchLocationViewModel = null;
       }
-
-       console.log('[LocationTracking] Preparing check-in payload with location:', this.currentLocationObj);
-
-      // Prepare parameters for API call
-      const params = {
-        team_member_empid: teamMemberEmpId,
-        teamid: teamId,
-        check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
-        is_app_check_In: true,
-        checkin_tag_id: UUID,
-        is_app_version: version.version,
-        createdby: employeeDetails.full_name,
-        checkin_user_empid: employeeDetails.id,
-        is_inrange: checkIsInRadius,
-        timesheetCategoryViewModel: timesheetCategoryViewModel,
-        timesheetSearchLocationViewModel: timesheetSearchLocationViewModel,
-        timesheetCurrentLocationViewModel: {
-          geo_address: this.currentLocationObj.formatted_address,
-          formatted_address: this.currentLocationObj.formatted_address,
-          lat: this.currentLocationObj.latitude,
-          lang: this.currentLocationObj.longitude,
-          street_number: this.currentLocationObj.street_number,
-          route: this.currentLocationObj.route,
-          locality: this.currentLocationObj.locality,
-          administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
-          administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
-          postal_code: this.currentLocationObj.postal_code,
-          country: this.currentLocationObj.country,
-        },
-      };
-      console.log('[LocationTracking] Check-in data fetched for tracking:', params);
-
-      // Make API call
-      const requestObj = {
-        endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_TIMESHEET_CHECKIN,
-        type: "post",
-        params: params,
-      };
-
-      const apiResponseData = await apiService(requestObj);
-
-       console.log('[LocationTracking] Check-in API response:', apiResponseData);
-
-      //  console.log("FULL apiResponseData:", apiResponseData);
-
-      if (apiResponseData.status == "200") {
-        console.log('[LocationTracking] ✅ Check-in successful. Enabling location tracking...');
-
-        await storeData(LocalDBItems.locationArrayForTracing, []);
-
-        const data = apiResponseData?.data ? apiResponseData.data : apiResponseData;
-console.log("THIS IS apiResponseData:", data);
-
-const checkInDetails = {
-  checkin_formatted_address: this.currentLocationObj.formatted_address || "",
-  checkin_lat: this.currentLocationObj.latitude || 0.0,
-  checkin_lang: this.currentLocationObj.longitude || 0.0,
-  checkin_street_number: this.currentLocationObj.street_number || "",
-  checkin_route: this.currentLocationObj.route || "",
-  checkin_locality: this.currentLocationObj.locality || "",
-  checkin_administrative_area_level_2: this.currentLocationObj.administrative_area_level_2 || "",
-  checkin_administrative_area_level_1: this.currentLocationObj.administrative_area_level_1 || "",
-  checkin_project: this.currentLocationObj.project || "",
-  checkin_jobType: this.currentLocationObj.jobType || "",
-};
-
-  await storeData(LocalDBItems.checkInLocationInfo, checkInDetails);
-
-  console.log("[CheckIn] ✅ Stored check-in details:", checkInDetails);
-        // Clear any existing timers
-        if (this.timer != null) {
-          clearInterval(this.timer);
-        }
-
-        // Store check-in data
-        const checkInCheckOutData = {
-          checkin_out_project: params.timesheetCategoryViewModel.project_or_comp_name,
-          checkin_out_jobType: params.timesheetCategoryViewModel.project_category_type
-        };
-        const checkinInfo = {
-          isOfficeChecin: this.state.isOffice,
-          isProjectCheckin: this.isProject,
-        };
-
-         storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData);
-         storeData(LocalDBItems.checkInInfo, checkinInfo);
-
-        // Handle location tracking
-        if (locationtracking==false) {
-          console.log("Location tracking is false")
-           storeData(LocalDBItems.isEmployeeLocationTrack, false);
-           this.locationFetcher.removeLocationUpdate();
-        } else {
-          console.log("Location tracking started");
-           storeData(LocalDBItems.isEmployeeLocationTrack, true);
-        }
-
-        // Navigate to HomeScreen with refresh parameters
-        this.props.navigation.navigate('HomeScreen', {
-          refresh: true,
-          checkInLocation: this.currentLocationObj,
-          checkInTime: params.check_in,
-          isNewCheckIn: true
-        });
-
-        // Show success message
-        const employeeDetails= await getData(LocalDBItems.employeeDetails);
-        const full_name = `${employeeDetails.full_name} checked in successfully`;
-        Toast.show(full_name, Toast.LONG);
+      if (getSelectedProjectData.project_id) {
+        this.isProject = true;
       } else {
-        throw new Error(apiResponseData.message || "Check-in failed");
+        this.isProject = false;
       }
-    } catch (error) {
-      console.error("Check-in error:", error);
-      Toast.show(error.message || "Check-in failed", Toast.LONG);
-
-      // Re-enable UI elements if needed
-      // this.setState({
-      //   showCameraLoader: false,
-      //   isVerifyFace: false
-      // });
+      this.state.isOffice = false;
     }
+    const params = {
+      team_member_empid: teamMemberEmpId,
+      teamid: teamId,
+      check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
+      is_app_check_In: true,
+      checkin_tag_id: this.UUID,
+      is_app_version: version.version,
+      createdby: employeeDetails.full_name,
+      checkin_user_empid: employeeDetails.id,
+      is_inrange: checkIsInRadius,
+      timesheetCategoryViewModel: timesheetCategoryViewModel,
+      timesheetSearchLocationViewModel: timesheetSearchLocationViewModel,
+      timesheetCurrentLocationViewModel: {
+        geo_address: this.currentLocationObj.formatted_address,
+        formatted_address: this.currentLocationObj.formatted_address,
+        lat: this.currentLocationObj.latitude,
+        lang: this.currentLocationObj.longitude,
+        street_number: this.currentLocationObj.street_number,
+        route: this.currentLocationObj.route,
+        locality: this.currentLocationObj.locality,
+        administrative_area_level_2: this.currentLocationObj
+          .administrative_area_level_2,
+        administrative_area_level_1: this.currentLocationObj
+          .administrative_area_level_1,
+        postal_code: this.currentLocationObj.postal_code,
+        country: this.currentLocationObj.country,
+      },
+    };
+    console.log("Parms Data", params);
+    const requestObj = {
+      endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_TIMESHEET_CHECKIN,
+      type: "post",
+      params: params,
+    };
+    const apiResponseData = await apiService(requestObj);
+    console.log("responseData", apiResponseData)
+if (apiResponseData.status == "200") {
+  if (this.timer != null) clearInterval(this.timer);
+
+  const checkInCheckOutData = {
+    checkin_out_project: params.timesheetCategoryViewModel.project_or_comp_name,
+    checkin_out_jobType: params.timesheetCategoryViewModel.project_category_type,
+  };
+  const checkinInfo = {
+    isOfficeChecin: this.state.isOffice,
+    isProjectCheckin: this.isProject,
+  };
+
+  await storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData);
+  await storeData(LocalDBItems.checkInInfo, checkinInfo);
+
+  if (locationtracking === false) {
+    await storeData(LocalDBItems.isEmployeeLocationTrack, false);
+    this.locationFetcher.removeLocationUpdate();
+  } else {
+    await storeData(LocalDBItems.isEmployeeLocationTrack, true);
+  }
+
+  // ✅ Trigger HomeScreen refresh before navigating back
+  if (this.props.route.params?.onGoBack) {
+    this.props.route.params.onGoBack();
+  }
+  this.props.navigation.goBack();
+
+  const emp = await getData(LocalDBItems.employeeDetails);
+  Toast.show(`${emp.full_name} checked in successfully`, Toast.LONG);
+}
   };
 
   /**
@@ -1747,8 +1661,11 @@ const checkInDetails = {
       params: params2,
     };
     const apiResponseData2 = await apiService(requestObj2);
+    console.log("chod", apiResponseData2)
 
     const lastest_time = apiResponseData2[0]["timesheetDataModels"][0]["id"];
+    console.log("Lastest_time", lastest_time);
+    console.log("Kallan ivde Und", this.Mobile_ID);
 
     let params3 = {
       org_id: employeDetails.org_id,
@@ -1775,16 +1692,16 @@ const checkInDetails = {
       modifiedby: employeDetails.id,
       is_deleted: false,
       is_app_check_In: true
-    };
-
+    }
+    console.log("params3", params3)
     const requestObj3 = {
       endpoint: BaseUrl.API_BASE_URL + Endpoint.FORCE_CHECKIN_REQUEST,
       type: "post",
       params: params3,
     };
     const apiResponseData3 = await apiService(requestObj3);
-
-    this.setState({ isForcecheckout: true });
+    console.log(apiResponseData3);
+    this.setState({ isForcecheckout: true })
     const checkInCheckOutData = {
       checkin_out_project: null,
       checkin_out_jobType: null
@@ -1793,15 +1710,15 @@ const checkInDetails = {
       isOfficeChecin: this.state.isOffice,
       isProjectCheckin: this.isProject,
     };
-
-    await storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData);
-    await storeData(LocalDBItems.checkInInfo, checkinInfo);
-
-    if (!locationtracking) {
-      await storeData(LocalDBItems.isEmployeeLocationTrack, false);
+    storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInCheckOutData)
+    storeData(LocalDBItems.checkInInfo, checkinInfo);
+    if (locationtracking == false) {
+      console.log(" Am stuck here help me");
+      storeData(LocalDBItems.isEmployeeLocationTrack, false);
       this.locationFetcher.removeLocationUpdate();
     } else {
-      await storeData(LocalDBItems.isEmployeeLocationTrack, true);
+      console.log(" Am stuck  me");
+      storeData(LocalDBItems.isEmployeeLocationTrack, true); //
     }
 
     this.props.navigation.navigate('HomeScreen', {
@@ -2929,36 +2846,22 @@ const checkInDetails = {
   }
 
   onChoosePlaceOffice = async (value) => {
-    console.log("Starting office location validation...");
+    console.log("inside place office");
+    const { organisationDetails } = this.state;
+    let isAllowed = organisationDetails.entityLocationRadius.is_allowed;
+    let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
+    if (isAllowed && checkIsInRadius) {
+      this.isAllowtocheckin = true;
 
-    try {
-      const isInRadius = await this.locationFetcher.isLocationInRadius();
-      console.log('Office radius validation result:', isInRadius);
-
-      this.isAllowtocheckin = isInRadius;
-      this.setState({
-        isOffice: isInRadius, // Only set to true if in radius
-        isWorkFromHome: false,
-        isManual: false,
-        isPlace: false,
-      });
-
-      if (!isInRadius) {
-        Alert.alert(
-          'Location Mismatch',
-          'You are not within the office premises'
-        );
-      }
-    } catch (error) {
-      console.error('Office location validation failed:', error);
-      this.isAllowtocheckin = false;
-      this.setState({
-        isOffice: false,
-        isWorkFromHome: false,
-        isManual: false,
-        isPlace: false,
-      });
+    } else {
+      this.isAllowtocheckin = value === true ? false : true;
     }
+      this.setState({
+      isOffice: true,
+        isWorkFromHome: false,
+        isManual: false,
+        isPlace: false,
+      });
   };
 
   onChoosePlaceWrkFrmHome = (value) => {
@@ -3126,38 +3029,33 @@ const checkInDetails = {
   });
 
   getLoctionObj = async (locationObj) => {
-    try {
-      // Update coordinates immediately
-      this.cordinateObj = {
-        latitude: locationObj.latitude,
-        longitude: locationObj.longitude
-      };
+    let locationName = this.currentLocationObj;
 
-      // Only fetch geocode details if we don't already have them
-      if (!this.currentLocationObj.formatted_address || Platform.OS === 'ios') {
-        const locationDetails = await this.geoCoder.getPlaceFromCordinate(
+    if (this.state.isLocationFetcherRequired) {
+
+      if (this.currentLocationObj.formatted_address == "") {
+
+        locationName = await this.geoCoder.getPlaceFromCordinate(
           locationObj.latitude,
           locationObj.longitude
         );
 
-        if (locationDetails) {
-          this.currentLocationObj = locationDetails;
-          console.log('Fetched location details:', locationDetails);
-
+      }
+      this.currentLocationObj = locationName;
+      console.log('locationName--->', locationName);
+      const newCordObj = {
+        longitude: locationObj.longitude,
+        latitude: locationObj.latitude,
+      };
+      this.cordinateObj = newCordObj;
+      if (!this.state.isManual) {
           this.setState({
-            locationName: locationDetails.formatted_address,
-            currentLocationObj: locationDetails,
+          locationName: this.currentLocationObj.formatted_address,
             isInitialLoad: false,
-            isLoading: false
+          isLoading: false,
           });
         }
-      }
-    } catch (error) {
-      console.error('Error getting location details:', error);
-      this.setState({
-        isLoading: false,
-        isInitialLoad: false
-      });
+      this.setState({ isInitialLoad: false, isLoading: false });
     }
   };
 
