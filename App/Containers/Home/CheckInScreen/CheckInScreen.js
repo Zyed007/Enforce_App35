@@ -80,7 +80,7 @@ export default class CheckInScreen extends React.Component {
       getProjectList: [],
       findProjectDetails: null,
       getAllTeamData: [],
-      UUID:"",
+      UUID: "",
       isTeamClicked: false,
       isForceCheckIn: false,
       isOffice: true,
@@ -185,7 +185,7 @@ export default class CheckInScreen extends React.Component {
   }
 
   async componentDidMount() {
-    counter_face_data=0
+    counter_face_data = 0
     const { navigation } = this.props;
     var locationObj = this.props.route.params.cordinateObj;
 
@@ -355,7 +355,6 @@ export default class CheckInScreen extends React.Component {
       this.GetAllTimesheetListByEmployeeID();
       this.reason_face = "face Recogonisation Issue";
     }
-
   }
 
   /**
@@ -591,6 +590,8 @@ export default class CheckInScreen extends React.Component {
     });
 
   };
+
+
   takePicture = async function () {
     if (this.camera) {
       let base64 = "";
@@ -611,7 +612,7 @@ export default class CheckInScreen extends React.Component {
     }
   };
 
-  handleSubmission=async()=>{
+  handleSubmission = async () => {
     const employeeDetails = await getData(LocalDBItems.employeeDetails);
     const full_name = `${employeeDetails.full_name} Reported the Face Error problem successfully`;
     Toast.show(full_name, Toast.LONG);
@@ -718,9 +719,9 @@ export default class CheckInScreen extends React.Component {
         filename,
         collection_id
       );
-      console.log(faceVerifyResult,"check face result")
+      console.log(faceVerifyResult, "check face result")
       const faceResult = faceVerifyResult.FaceMatches;
-      console.log(faceResult,"check face result 2")
+      console.log(faceResult, "check face result 2")
       console.log("counter face", counter_face_data)
       if (counter_face_data < 2) {
         if (
@@ -754,7 +755,7 @@ export default class CheckInScreen extends React.Component {
                   }
                 } else {
                   // This is for single checkin
-                  console.log("Sigle Checkin")
+                  console.log("Single Checkin")
                   if (this.state.isForceCheckIn == true) {
                     console.log("Checin in the First area");
                     this.addTimesheetForceCheckIn();
@@ -959,7 +960,7 @@ export default class CheckInScreen extends React.Component {
       teamid: teamId,
       check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
       is_app_check_In: true,
-      checkin_tag_id:this.UUID,
+      checkin_tag_id: this.UUID,
       is_app_version: version.version,
       createdby: employeeDetails.full_name,
       checkin_user_empid: employeeDetails.id,
@@ -982,7 +983,7 @@ export default class CheckInScreen extends React.Component {
         country: this.currentLocationObj.country,
       },
     };
-    console.log("Parms Data",params);
+    console.log("Parms Data", params);
     const requestObj = {
       endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_TIMESHEET_CHECKIN,
       type: "post",
@@ -1173,13 +1174,13 @@ export default class CheckInScreen extends React.Component {
       }
       this.state.isOffice = false;
     }
-    console.log(UUID,"UUID");
+    console.log(UUID, "UUID");
     const params = {
       team_member_empid: teamMemberEmpId,
       teamid: teamId,
       check_in: moment(new Date()).utc(true).format("MM/DD/YYYY hh:mm A"),
       is_app_check_In: true,
-      checkin_tag_id:this.UUID,
+      checkin_tag_id: this.UUID,
       is_app_version: version.version,
       createdby: employeeDetails.full_name,
       checkin_user_empid: employeeDetails.id,
@@ -1202,7 +1203,7 @@ export default class CheckInScreen extends React.Component {
         country: this.currentLocationObj.country,
       },
     };
-    console.log("Parms Data",params);
+    console.log("Parms Data", params);
     const requestObj = {
       endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_TIMESHEET_CHECKIN,
       type: "post",
@@ -1254,8 +1255,8 @@ export default class CheckInScreen extends React.Component {
         return this.state.caseColors;
       case 2:
         return this.state.placeColors;
-        default:
-          return ["#ffffff"]; 
+      default:
+        return ["#ffffff"];
     }
   };
   /**
@@ -1575,33 +1576,33 @@ export default class CheckInScreen extends React.Component {
     try {
       const orgId = await getData(LocalDBItems.employeeDetails);
       const organisationDetails = await getData(LocalDBItems.organizationDetails);
-  
+
       const params = { id: orgId.org_id };
       const requestObj = {
         endpoint: BaseUrl.API_BASE_URL + Endpoint.FETCHALL_PROJECTBY_ORGID,
         type: "post",
         params,
       };
-  
+
       const apiResponseData = await apiService(requestObj);
       if (!apiResponseData) throw new Error("No API response");
-  
+
       const getProjectData = JSON.parse(apiResponseData);
       const projectName = getProjectData.map((value) => ({
         ...value,
         label: value.project_name,
         value: value.project_name,
       }));
-  
+
       const officeAddress = {
         ...organisationDetails,
         label: organisationDetails.org_name,
         value: organisationDetails.org_id,
       };
-  
+
       const employeeTeam = [...this.state.teamMemberEmpId, orgId.id];
       const officeArray = [{ label: officeAddress.org_name, value: 0 }]; // Using index 0 since only 1 org
-  
+
       this.setState({
         getAllProjectData: getProjectData,
         getProjectList: projectName,
@@ -1610,13 +1611,13 @@ export default class CheckInScreen extends React.Component {
         selectedOfficeValue: officeArray.length > 0 ? officeArray[0].value : null,
         teamMemberEmpId: employeeTeam,
       });
-  
+
     } catch (error) {
       console.error("fetchAllProjectByOrgID failed:", error);
       // Optionally: Update state to show error UI
     }
   };
-  
+
   onPressFindTeamByOrgID = async () => {
     if (!this.state.isTeamClicked) {
       this.setState({ isTeamClicked: true });
@@ -2940,50 +2941,50 @@ export default class CheckInScreen extends React.Component {
           onChoosePlace={(value) => this.onChoosePlace(value)}
           isPlace={this.state.isPlace}
         />
-          {this.state.isOffice && !this.state.isPlace && this.state.officeAddressPlace.length > 0 ? (
-            <DropDownPicker
-  open={this.state.dropdownOpen}
-  value={this.state.selectedOfficeValue}
-  items={this.state.officeAddressPlace}
-  setOpen={(open) => this.setState({ dropdownOpen: open })}
-  setValue={(callback) => {
-    const value = callback(this.state.selectedOfficeValue);
-    const selectedItem = this.state.officeAddressPlace.find(item => item.value === value);
-    const index = this.state.officeAddressPlace.findIndex(item => item.value === value);
-    this.setState({ selectedOfficeValue: value });
-    this.onSelectOfficeLocation(selectedItem, index);
-  }}
-  setItems={(items) => this.setState({ officeAddressPlace: items })}
-  placeholder="Select office"
-  searchable={true}
-  searchPlaceholder="Search for office"
-  containerStyle={{
-    height: 60,
-    width: '90%',
-    alignSelf: 'center',
-    marginTop: 20,
-  }}
-  style={[
-    styles.dropDownContainer,
-    { marginTop: 5, backgroundColor: 'lightgrey' },
-  ]}
-  dropDownContainerStyle={{
-    backgroundColor: '#fcfcfc',
-    zIndex: 10000,
-  }}
-  textStyle={{
-    fontSize: 16,
-    color: '#000',
-  }}
-/>
+        {this.state.isOffice && !this.state.isPlace && this.state.officeAddressPlace.length > 0 ? (
+          <DropDownPicker
+            open={this.state.dropdownOpen}
+            value={this.state.selectedOfficeValue}
+            items={this.state.officeAddressPlace}
+            setOpen={(open) => this.setState({ dropdownOpen: open })}
+            setValue={(callback) => {
+              const value = callback(this.state.selectedOfficeValue);
+              const selectedItem = this.state.officeAddressPlace.find(item => item.value === value);
+              const index = this.state.officeAddressPlace.findIndex(item => item.value === value);
+              this.setState({ selectedOfficeValue: value });
+              this.onSelectOfficeLocation(selectedItem, index);
+            }}
+            setItems={(items) => this.setState({ officeAddressPlace: items })}
+            placeholder="Select office"
+            searchable={true}
+            searchPlaceholder="Search for office"
+            containerStyle={{
+              height: 60,
+              width: '90%',
+              alignSelf: 'center',
+              marginTop: 20,
+            }}
+            style={[
+              styles.dropDownContainer,
+              { marginTop: 5, backgroundColor: 'lightgrey' },
+            ]}
+            dropDownContainerStyle={{
+              backgroundColor: '#fcfcfc',
+              zIndex: 10000,
+            }}
+            textStyle={{
+              fontSize: 16,
+              color: '#000',
+            }}
+          />
 
-          ) : (
-            <LocationText
-              locationName={this.getLocationName()}
-              isEditabe={this.state.isManual}
-              setLocationName={(text) => this.setLocationName(text)}
-            />
-          )}
+        ) : (
+          <LocationText
+            locationName={this.getLocationName()}
+            isEditabe={this.state.isManual}
+            setLocationName={(text) => this.setLocationName(text)}
+          />
+        )}
 
         {isPlace && (
           <MapViewEnforce
@@ -3274,16 +3275,16 @@ export default class CheckInScreen extends React.Component {
             colors={this.getNavigationColor()}
           >
             <MaterialTabs
-  items={["Job", "Case", "Place"]}
-  selectedIndex={this.state.selectedTab}
-  onChange={(e) => this.setSelectedTab(e)}
-  uppercase={false}
-  textStyle={{ fontSize: 21, fontWeight: "700" }}
-  barColor="transparent"
-  indicatorColor="black"
-  activeTextColor="#71797E	"         // Selected tab = white
-  inactiveTextColor="black"       // Unselected tabs = black
-/>
+              items={["Job", "Case", "Place"]}
+              selectedIndex={this.state.selectedTab}
+              onChange={(e) => this.setSelectedTab(e)}
+              uppercase={false}
+              textStyle={{ fontSize: 21, fontWeight: "700" }}
+              barColor="transparent"
+              indicatorColor="black"
+              activeTextColor="#71797E	"         // Selected tab = white
+              inactiveTextColor="black"       // Unselected tabs = black
+            />
           </LinearGradient>
           <ScrollView
             contentContainerStyle={{ paddingBottom: 60 }}
