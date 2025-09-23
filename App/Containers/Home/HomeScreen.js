@@ -138,7 +138,7 @@ export default class HomeScreen extends React.Component {
         latitude: 25.2048,
         longitude: 55.2708,
       }),
-    (this.geoCoder = new GeoCoder());
+      (this.geoCoder = new GeoCoder());
     this.currentLocationObj = {
       formatted_address: "",
       street_number: "",
@@ -158,7 +158,7 @@ export default class HomeScreen extends React.Component {
     this.isCheckinAdmin = null;
   }
 
-   handleAppStateChange = (nextAppState) => {
+  handleAppStateChange = (nextAppState) => {
     this.setState({ appState: nextAppState });
 
   };
@@ -170,9 +170,9 @@ export default class HomeScreen extends React.Component {
     this.getEmployeeDetails()
     this.lastCheckinByEmpID(true)
     this.geoCoder.initiaLizeGeoCoder()
-    this.UUID=await getUUID()
-  // Add app state listener (NEW API)
-  this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
+    this.UUID = await getUUID()
+    // Add app state listener (NEW API)
+    this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
 
     this.getEmployeeDetails();
     this.lastCheckinByEmpID(true);
@@ -192,7 +192,7 @@ export default class HomeScreen extends React.Component {
     this.getLocationTrackingNeeded()
     checkout_counter = 0;
   }
-  
+
   getLocationTrackingNeeded = async () => {
     let isLiveTracking = await getData(LocalDBItems.isLocationTrackingNeeded)
     if (isLiveTracking) {
@@ -203,13 +203,13 @@ export default class HomeScreen extends React.Component {
   }
   componentWillUnmount() {
     // Remove app state listener
-  //   if (this.appStateSubscription) {
-  //   this.appStateSubscription.remove();
-  // }
-  // if (this._unsubscribe) {
-  //   this._unsubscribe();
-  // }
-    
+    //   if (this.appStateSubscription) {
+    //   this.appStateSubscription.remove();
+    // }
+    // if (this._unsubscribe) {
+    //   this._unsubscribe();
+    // }
+
     clearInterval(this.timerCheckIn);
     clearInterval(this.timerBreakIn);
   }
@@ -433,35 +433,35 @@ export default class HomeScreen extends React.Component {
   /**
    * After face verification, user navigates to home screen and need to refresh with check in data
    */
-refresh = async () => {
-  const employeeDetails = await getData(LocalDBItems.employeeDetails);
+  refresh = async () => {
+    const employeeDetails = await getData(LocalDBItems.employeeDetails);
 
-  let isFetchedGeoCorderObj = await this.fetchGeocoderObject();
-  if (!isFetchedGeoCorderObj) {
-    Toast.show("Unable to fetch geo location info", Toast.LONG);
-  }
+    let isFetchedGeoCorderObj = await this.fetchGeocoderObject();
+    if (!isFetchedGeoCorderObj) {
+      Toast.show("Unable to fetch geo location info", Toast.LONG);
+    }
 
-  this.lastCheckinByEmpID(true);
+    this.lastCheckinByEmpID(true);
 
-  let isTracking = await getData(LocalDBItems.isLocationTrackingNeeded);
-  console.log("is Tracking value in refresh", isTracking);
+    let isTracking = await getData(LocalDBItems.isLocationTrackingNeeded);
+    console.log("is Tracking value in refresh", isTracking);
 
-  // ✅ Always fetch dict
-  const checkinDict = await this.getCheckinDict();
-  console.log("Checkin Dict Value",checkinDict);
+    // ✅ Always fetch dict
+    const checkinDict = await this.getCheckinDict();
+    console.log("Checkin Dict Value", checkinDict);
 
-  if (isTracking) {
-    await storeData(LocalDBItems.isLocationTrackingNeeded, false);
-    console.log("is Tracking value in refresh changed", isTracking);
-    this.isTripEnd = true;
-    await this.locationTrackingNewApi(checkinDict, this.isTripEnd);
-    await this.resetTracking();
-  } else {
-    // ✅ Still call with dict when tracking is false
-    await this.locationTrackingNewApi(checkinDict, this.isTripEnd);
-    console.log("----------called from locationTrackingNewApi");
-  }
-};
+    if (isTracking) {
+      await storeData(LocalDBItems.isLocationTrackingNeeded, false);
+      console.log("is Tracking value in refresh changed", isTracking);
+      this.isTripEnd = true;
+      await this.locationTrackingNewApi(checkinDict, this.isTripEnd);
+      await this.resetTracking();
+    } else {
+      // ✅ Still call with dict when tracking is false
+      await this.locationTrackingNewApi(checkinDict, this.isTripEnd);
+      console.log("----------called from locationTrackingNewApi");
+    }
+  };
 
 
 
@@ -484,12 +484,12 @@ refresh = async () => {
   /**
    * Navigate to check in screen
    */
-navigateToCheckInScreen = async () => {
+  navigateToCheckInScreen = async () => {
     console.log('Navigating to checkin Screen');
 
-        // Navigate with complete location data
+    // Navigate with complete location data
     NavigationService.navigate("CheckInScreen", {
-      onGoBack:()=>this.refresh(),
+      onGoBack: () => this.refresh(),
       locationDetails: this.state.locationDetails, // Pass entire location object
       cordinateObj: this.cordinateObj,
       // fullLocationDetails: locationDetails,
@@ -517,7 +517,7 @@ navigateToCheckInScreen = async () => {
     // );
 
 
-};
+  };
 
   location_feching = async () => {
     Geolocation.getCurrentPosition(location_info => this.location_value = location_info)
@@ -530,24 +530,24 @@ navigateToCheckInScreen = async () => {
     }, 1000);
   }
 
-// getCurrentLocation = () => {
-//   return new Promise((resolve) => {
-//     Geolocation.getCurrentPosition(
-//       position => {
-//         resolve({
-//           latitude: position.coords.latitude,
-//           longitude: position.coords.longitude,
-//           formatted_address: "Current Location"
-//         });
-//       },
-//       error => {
-//         console.error(error);
-//         resolve(null);
-//       },
-//       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-//     );
-//   });
-// };
+  // getCurrentLocation = () => {
+  //   return new Promise((resolve) => {
+  //     Geolocation.getCurrentPosition(
+  //       position => {
+  //         resolve({
+  //           latitude: position.coords.latitude,
+  //           longitude: position.coords.longitude,
+  //           formatted_address: "Current Location"
+  //         });
+  //       },
+  //       error => {
+  //         console.error(error);
+  //         resolve(null);
+  //       },
+  //       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+  //     );
+  //   });
+  // };
 
 
 
@@ -564,19 +564,19 @@ navigateToCheckInScreen = async () => {
   };
 
 
-forceCheckOut = async (isEndOfWork = false) => {
+  forceCheckOut = async (isEndOfWork = false) => {
     console.log('Forcecehckoutfunction');
     console.log('post checkout', this.currentLocationObj);
- 
+
     const value = await AsyncStorage.getItem("newNameKey");
     console.log("Value", value);
- 
+
     const userId = await getData(LocalDBItems.employeeDetails);
     const checkInDetails = await getData(LocalDBItems.CHECK_IN_OUT_DETAILS);
     let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
- 
+
     this.setState({ loading: true });
- 
+
     if (value === 'Forgot to Checkout') {
       const date = await AsyncStorage.getItem("forcetime");
       let formattedTime = moment().format("MM/DD/YYYY") + ' ' + date;
@@ -588,9 +588,9 @@ forceCheckOut = async (isEndOfWork = false) => {
       console.log('elseformattedTime*******', formattedTime);
       this.forceCheckoutTime = moment(formattedTime, "MM/DD/YYYY hh:mm:A").toDate();
     }
- 
+
     console.log('-----205');
- 
+
     let params = {
       team_member_empid: this.checkInDataValue.empid,
       groupid: this.checkInDataValue.groupid,
@@ -613,21 +613,21 @@ forceCheckOut = async (isEndOfWork = false) => {
         country: this.currentLocationObj.country,
       },
     };
- 
+
     console.log("Params for Force Checkout", params);
- 
+
     await storeData(LocalDBItems.checkOutLocationInfo, this.currentLocationObj);
- 
+
     const requestObj = {
       endpoint: BaseUrl.API_BASE_URL + Endpoint.FORCE_TIMESHEET_CHECKOUT,
       type: "post",
       params: params,
     };
- 
+
     console.log("Sending Force Checkout API Request");
     const apiResponseData = await apiService(requestObj);
- 
-if (apiResponseData.status === "200") {
+
+    if (apiResponseData.status === "200") {
       if (isEndOfWork) {
         // Stop location tracking if it's End of Work
         this.timer_error = false;
@@ -638,160 +638,35 @@ if (apiResponseData.status === "200") {
         this.locationFetcher.removeLocationUpdate();
       } if (!isEndOfWork) {
         this.startTracking();
-  await storeData(LocalDBItems.isLocationTrackingNeeded, true);
-  this.isTripEnd = false;
+        await storeData(LocalDBItems.isLocationTrackingNeeded, true);
+        this.isTripEnd = false;
         const checkinDict = await this.getCheckinDict();
-  if (this.trackRef) {
+        if (this.trackRef) {
           await this.trackRef.locationTrackingNewApi(checkinDict);
-  }
-      }else {
+        }
+      } else {
         // Enable location tracking for Force Checkout
         await storeData(LocalDBItems.isLocationTrackingNeeded, true);
         this.isTripEnd = false;
 
-  // Prepare check-in dict and sync once
-  const checkinDict = await this.getCheckinDict();
-  if (this.trackRef && typeof this.trackRef.locationTrackingNewApi === 'function') {
-    await this.trackRef.locationTrackingNewApi(checkinDict);
-  }
+        const checkinDict = await this.getCheckinDict();
+        if (this.trackRef && typeof this.trackRef.locationTrackingNewApi === 'function') {
+          await this.trackRef.locationTrackingNewApi(checkinDict);
+        }
 
-  // Start continuous tracking
-  this.startTracking();
+        this.startTracking();
       }
 
-  // ---- Clear timers + Reset state (your existing code) ----
-  clearInterval(this.timerCheckIn);
-  clearInterval(this.timerBreakIn);
-  clearInterval(this.showTimerForAutoCheckOut);
-  this.timerStopCounter = 0;
-  this.timerStopForBreakCounter = 0;
-
-      // Reset state
-  this.setState({
-    loading: false,
-    breakInData: null,
-    checkInData: null,
-    isStarted: false,
-    isBreak: false,
-    stopWatchCounter: "00:00",
-    stopWatchCounterBreakIn: "00:00",
-    progressBarPercentage: 0,
-    showAlertPopup: false,
-    isCheckOutPopup: false,
-    showLiveTrackingButton: true,
-  });
-
-  const full_name = `${userId.full_name} Force checked Out successfully`;
-  Toast.show(full_name, Toast.LONG);
-
-} else {
-  // API failed — stop loading and show error
-  this.setState({ loading: false });
-  Toast.show("Force checkout failed. Please try again.", Toast.LONG);
-}
-
-  };
-  /**
-   * show popup and checkout modal
-   */
-showPopupAndCheckOut = async () => {
-  this.setState({ showAlertPopup: true, isCheckOutPopup: true });
-};
-  /**
-   * This method is to post the checkout
-   * @param {bool} isEndOfWork
-   */
-postCheckout = async (isEndOfWork = false) => {
-  console.log("post checkout", this.currentLocationObj);
-  this.setState({ loading: true });
-
-  try {
-    const userId = await getData(LocalDBItems.employeeDetails);
-    const checkInDetails = await getData(LocalDBItems.CHECK_IN_OUT_DETAILS);
-    const date = await AsyncStorage.getItem("forcetime");
-    let formattedTime = moment().format("MM/DD/YYYY") + " " + date;
-    let forceCheckoutTime = moment(formattedTime, "YYYY-MM-DD HH:mm").format(
-      "YYYY-MM-DD HH:mm:ss.SSS"
-    );
-
-    console.log("forceCheckoutTime", forceCheckoutTime);
-
-    let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
-    console.log("-----205", checkIsInRadius);
-
-    let isFetchedGeoCorderObj = await this.fetchGeocoderObject();
-    console.log("isFetchedGeoCorderObj", isFetchedGeoCorderObj);
-
-    if (!isFetchedGeoCorderObj) {
-      if (checkout_counter < 2) {
-        Toast.show("Unable to fetch geo location info", Toast.LONG);
-        checkout_counter++;
-      } else {
-        this.location_feching();
-        Toast.show(
-          "We have successfully registered your Technical Error",
-          Toast.LONG
-        );
-      }
-      return; // stop execution here
-    }
-
-    // ✅ straight forward case
-    let params = {
-      team_member_empid: this.checkInDataValue.empid,
-      groupid: this.checkInDataValue.groupid,
-      check_out: formattedTime,
-      checkout_tag_id: this.UUID,
-      is_inrange: checkIsInRadius ? checkIsInRadius : false,
-      modifiedby: userId.full_name,
-      check_out_method: isEndOfWork,
-      TimesheetCurrentLocationViewModel: {
-        formatted_address: this.currentLocationObj.formatted_address,
-        lat: this.cordinateObj.latitude,
-        lang: this.cordinateObj.longitude,
-        street_number: this.currentLocationObj.street_number,
-        route: this.currentLocationObj.route,
-        locality: this.currentLocationObj.locality,
-        administrative_area_level_2:
-          this.currentLocationObj.administrative_area_level_2,
-        administrative_area_level_1:
-          this.currentLocationObj.administrative_area_level_1,
-        postal_code: this.currentLocationObj.postal_code,
-        country: this.currentLocationObj.country,
-      },
-    };
-
-    await storeData(LocalDBItems.checkOutLocationInfo, this.currentLocationObj);
-    console.log("Params for checkout", params);
-
-    const requestObj = {
-      endpoint: BaseUrl.API_BASE_URL + Endpoint.TIMESHEET_CHECKOUT,
-      type: "post",
-      params: params,
-    };
-
-    const apiResponseData = await apiService(requestObj);
-    console.log("API response checkout", apiResponseData);
-
-    if (apiResponseData?.status === "200") {
-      if (isEndOfWork) {
-        this.timer_error = false;
-        this.isWorkEnded = true;
-        this.isCheckinForLocation = false;
-        await storeData(LocalDBItems.isEmployeeLocationTrack, false);
-        await storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInDetails);
-        this.locationFetcher.removeLocationUpdate();
-      } else {
-        this.startTracking(); // for check out
-      }
-
+      // Clear timers
       clearInterval(this.timerCheckIn);
       clearInterval(this.timerBreakIn);
       clearInterval(this.showTimerForAutoCheckOut);
       this.timerStopCounter = 0;
       this.timerStopForBreakCounter = 0;
 
+      // Reset state
       this.setState({
+        loading: false,
         breakInData: null,
         checkInData: null,
         isStarted: false,
@@ -801,214 +676,156 @@ postCheckout = async (isEndOfWork = false) => {
         progressBarPercentage: 0,
         showAlertPopup: false,
         isCheckOutPopup: false,
+        showLiveTrackingButton: true,
       });
 
-      const full_name = `${userId.full_name}'s Checked Out successfully`;
+      const full_name = `${userId.full_name} Force checked Out successfully`;
       Toast.show(full_name, Toast.LONG);
-
-      const checkinInfo = { isOfficeChecin: false, isProjectCheckin: false };
-      await storeData(LocalDBItems.checkInInfo, checkinInfo);
     } else {
-      if (checkout_counter < 2) {
-        Toast.show(
-          "Your Checkin Location And CheckOut Location Doesn't Match. Please Retry",
-          Toast.LONG
-        );
-        checkout_counter++;
-      } else {
-        this.setState({ isForceCheckoutPopUp: true });
-      }
+      // API failed — stop loading and show error
+      this.setState({ loading: false });
+      Toast.show("Force checkout failed. Please try again.", Toast.LONG);
     }
-  } catch (error) {
-    console.log("Checkout API failed", error);
-    Toast.show("Checkout failed. Please try again.", Toast.LONG);
-  } finally {
-    // 🔑 guarantee loader stops no matter what
-    this.setState({ loading: false, isCheckOutPopup: false, showAlertPopup: false });
-  }
-};
+  };
+  /**
+   * show popup and checkout modal
+   */
+  showPopupAndCheckOut = async () => {
+    this.setState({ showAlertPopup: true, isCheckOutPopup: true });
+  };
+  /**
+   * This method is to post the checkout
+   * @param {bool} isEndOfWork
+   */
+  postCheckout = async (isEndOfWork = false) => {
+    console.log("post checkout", this.currentLocationObj);
+    this.setState({ loading: true });
+
+    try {
+      const userId = await getData(LocalDBItems.employeeDetails);
+      const checkInDetails = await getData(LocalDBItems.CHECK_IN_OUT_DETAILS);
+      const date = await AsyncStorage.getItem("forcetime");
+      let formattedTime = moment().format("MM/DD/YYYY") + " " + date;
+      let forceCheckoutTime = moment(formattedTime, "YYYY-MM-DD HH:mm").format(
+        "'YYYY-MM-DD HH:mm'"
+      );
+
+      console.log("forceCheckoutTime", forceCheckoutTime);
+
+      let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
+      console.log("-----205", checkIsInRadius);
+
+      let isFetchedGeoCorderObj = await this.fetchGeocoderObject();
+      console.log("isFetchedGeoCorderObj", isFetchedGeoCorderObj);
+
+      if (!isFetchedGeoCorderObj) {
+        if (checkout_counter < 2) {
+          Toast.show("Unable to fetch geo location info", Toast.LONG);
+          checkout_counter++;
+        } else {
+          this.location_feching();
+          Toast.show(
+            "We have successfully registered your Technical Error",
+            Toast.LONG
+          );
+        }
+        this.setState({ loading: false }); // 👈 stop the loader
+        return;
+      }
+
+      // ✅ straight forward case
+      let params = {
+        team_member_empid: this.checkInDataValue.empid,
+        groupid: this.checkInDataValue.groupid,
+        check_out: formattedTime,
+        checkout_tag_id: this.UUID,
+        is_inrange: checkIsInRadius ? checkIsInRadius : false,
+        modifiedby: userId.full_name,
+        check_out_method: isEndOfWork,
+        TimesheetCurrentLocationViewModel: {
+          formatted_address: this.currentLocationObj.formatted_address,
+          lat: this.cordinateObj.latitude,
+          lang: this.cordinateObj.longitude,
+          street_number: this.currentLocationObj.street_number,
+          route: this.currentLocationObj.route,
+          locality: this.currentLocationObj.locality,
+          administrative_area_level_2:
+            this.currentLocationObj.administrative_area_level_2,
+          administrative_area_level_1:
+            this.currentLocationObj.administrative_area_level_1,
+          postal_code: this.currentLocationObj.postal_code,
+          country: this.currentLocationObj.country,
+        },
+      };
+
+      await storeData(LocalDBItems.checkOutLocationInfo, this.currentLocationObj);
+      console.log("Params for checkout", params);
+
+      const requestObj = {
+        endpoint: BaseUrl.API_BASE_URL + Endpoint.TIMESHEET_CHECKOUT,
+        type: "post",
+        params: params,
+      };
+
+      const apiResponseData = await apiService(requestObj);
+      console.log("API response checkout", apiResponseData);
+
+      if (apiResponseData?.status === "200") {
+        if (isEndOfWork) {
+          this.timer_error = false;
+          this.isWorkEnded = true;
+          this.isCheckinForLocation = false;
+          await storeData(LocalDBItems.isEmployeeLocationTrack, false);
+          await storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInDetails);
+          this.locationFetcher.removeLocationUpdate();
+        } else {
+          this.startTracking(); // for check out
+        }
+
+        clearInterval(this.timerCheckIn);
+        clearInterval(this.timerBreakIn);
+        clearInterval(this.showTimerForAutoCheckOut);
+        this.timerStopCounter = 0;
+        this.timerStopForBreakCounter = 0;
+
+        this.setState({
+          breakInData: null,
+          checkInData: null,
+          isStarted: false,
+          isBreak: false,
+          stopWatchCounter: "00:00",
+          stopWatchCounterBreakIn: "00:00",
+          progressBarPercentage: 0,
+          showAlertPopup: false,
+          isCheckOutPopup: false,
+        });
+
+        const full_name = `${userId.full_name}'s Checked Out successfully`;
+        Toast.show(full_name, Toast.LONG);
+
+        const checkinInfo = { isOfficeChecin: false, isProjectCheckin: false };
+        await storeData(LocalDBItems.checkInInfo, checkinInfo);
+      } else {
+        console.log("checkout counter:", checkout_counter);
+        if (checkout_counter >= 2) {
+          // Show force checkout popup only after 2 failed tries
+          this.setState({ isForceCheckoutPopUp: true });
+        } else {
+          // First failure → just show a retry message
+          Toast.show("Checkout failed. Please try again.", Toast.LONG);
+          checkout_counter++;
+        }
+      }
+    } catch (error) {
+      console.log("Checkout API failed", error);
+      Toast.show("Checkout failed. Please try again.", Toast.LONG);
+    } finally {
+      // 🔑 guarantee loader stops no matter what
+      this.setState({ loading: false, isCheckOutPopup: false, showAlertPopup: false });
+    }
+  };
 
 
-// handleForceCheckoutComplete = () => {
-//   this.setState({ 
-//     isForceCheckoutPopUp: false,
-//     loading: false 
-//   });
-//   this.resetCheckoutState();
-// };
-
-// // Add this method if you don't have it
-// resetCheckoutState = () => {
-//   // Reset all checkout-related states
-//   this.timerStopCounter = 0;
-//   this.timerStopForBreakCounter = 0;
-//   this.setState({
-//     breakInData: null,
-//     checkInData: null,
-//     isStarted: false,
-//     isBreak: false,
-//     stopWatchCounter: "00:00",
-//     stopWatchCounterBreakIn: "00:00",
-//     progressBarPercentage: 0,
-//   });
-// };
-
-
-  //   errortimer = async () => {
-  //     if(this.timer_error == false)
-  //     {
-  //     console.log(this.timer_error)
-  //     }
-  //     else{
-  // if(counter < 2)
-  // {
-  //   {   
-  //     this.setState({loading : false});
-  //     Alert.alert('Request Timeout','You are Exceeded request timeout please Refresh the page',[
-  //       {
-  //         text: 'Refresh',
-  //         onPress: () => this.onGoBackToPreviousCheckOut(),
-  //         style:'cancel'
-  //       },]);
-  //   }
-
-  // }
-  // else          
-  // {
-  //   this.setState({loading : false});
-  //   Alert.alert('Request Timeout','You are Exceeded the refresh try Kindly please report the issue',[
-  //     {
-  //       text: 'Report the problem',
-  //       onPress: () => this.submitReport(),
-  //       style:'cancel'
-  //     },]);
-  //   }
-  //     }
-
-  // }
-
-  // checkoutmodal = async () => {
-  //   console.log("Exited")
-  //   let params = {
-  //     team_member_empid: this.checkInDataValue.empid,
-  //     groupid: this.checkInDataValue.groupid,
-  //     check_out: moment(new Date()).utc(true).format("DD/MM/YYYY hh:mm a"),
-  //     is_inrange: checkIsInRadius ? checkIsInRadius : false,
-  //     modifiedby: userId.full_name,
-  //     TimesheetCurrentLocationViewModel: {
-  //       formatted_address: this.currentLocationObj.formatted_address,
-  //       lat: this.cordinateObj.latitude,
-  //       lang: this.cordinateObj.longitude,
-  //       street_number: this.currentLocationObj.street_number,
-  //       route: this.currentLocationObj.route,
-  //       locality: this.currentLocationObj.locality,
-  //       administrative_area_level_2: this.currentLocationObj
-  //         .administrative_area_level_2,
-  //       administrative_area_level_1: this.currentLocationObj
-  //         .administrative_area_level_1,
-  //       postal_code: this.currentLocationObj.postal_code,
-  //       country: this.currentLocationObj.country,
-  //     },
-  //   };
-  //   await storeData(LocalDBItems.checkOutLocationInfo, this.currentLocationObj);
-
-  //   const requestObj = {
-  //     endpoint: BaseUrl.API_BASE_URL + Endpoint.TIMESHEET_CHECKOUT,
-  //     type: "post",
-  //     params: params,
-  //   };
-  //   const apiResponseData = await apiService(requestObj);
-  //   setTimeout(() => {
-  //     this.setState({
-  //       loading: false,
-  //     });
-
-  //     /*-- Changing for the stimulation of the error  */ 
-  //     if (apiResponseData.status === "200") {
-  //       if (isEndOfWork) {
-  //         this.timer_error = false;
-  //         this.isWorkEnded = true;
-  //         this.isCheckinForLocation = false;
-  //         storeData(LocalDBItems.isEmployeeLocationTrack, false);
-  //         storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInDetails)
-  //         this.locationFetcher.removeLocationUpdate();
-  //       } else {
-  //         this.startTracking(); //for check out
-  //       }
-  //       clearInterval(this.timerCheckIn);
-  //       clearInterval(this.timerBreakIn);
-  //       clearInterval(this.showTimerForAutoCheckOut);
-  //       this.timerStopCounter = 0;
-  //       this.timerStopForBreakCounter = 0;
-  //       this.setState({
-  //         breakInData: null,
-  //         checkInData: null,
-  //         isStarted: false,
-  //         isBreak: false,
-  //         stopWatchCounter: "00:00",
-  //         stopWatchCounterBreakIn: "00:00",
-  //         loading: false,
-  //         progressBarPercentage: 0,
-  //         showAlertPopup: false,
-  //         isCheckOutPopup: false,
-  //       });
-  //       const full_name = `${userId.full_name}'s Checked Out sucessfully`;
-  //       Toast.show(full_name, Toast.LONG);
-  //       const checkinInfo = { isOfficeChecin: false, isProjectCheckin: false };
-  //       storeData(LocalDBItems.checkInInfo, checkinInfo);
-  //     } 
-  //     else 
-  //     {
-  //       console.log('error', apiResponseData.result.code)
-  //       Toast.show(apiResponseData.result.code || "Something went wrong", Toast.LONG)
-  //       this.setState({loading: false})
-  //     }
-  //   }, 1000);
-  // }
-
-  // submitReport = async () => {
-  //     console.log(value)
-  //     const employeeDetails = await getData(LocalDBItems.employeeDetails);
-  //     const params = {
-  //       org_id : employeeDetails.org_id,
-  //       eventName : "Force_checkOut",
-  //       emp_id :  employeeDetails.id,
-  //       emp_Name : employeeDetails.full_name,
-  //       createdDate: moment(new Date()).utc(true).format("DD/MM/YYYY hh:mm a"),
-  //       modifiedDate:moment(new Date()).utc(true).format("DD/MM/YYYY hh:mm a"),
-  //     };
-  //     const requestObj = {
-  //       endpoint: BaseUrl.API_BASE_URL + Endpoint.ADD_FORCE_TIMESHEET_CHECKIN,
-  //       type: "post",
-  //       params: params,
-  //     };
-  //     const apiResponseData = await apiService(requestObj);
-  //     if (apiResponseData.status == "200") {
-  //       if (this.timer != null) {
-  //         clearInterval(this.timer);
-  //       }
-  //     }
-  //     clearInterval(this.timerCheckIn);
-  //     clearInterval(this.timerBreakIn);
-  //     clearInterval(this.showTimerForAutoCheckOut);
-  //     this.timerStopCounter = 0;
-  //     this.timerStopForBreakCounter = 0;
-  //     this.setState({
-  //       breakInData: null,
-  //       checkInData: null,
-  //       isStarted: false,
-  //       isBreak: false,
-  //       stopWatchCounter: "00:00",
-  //       stopWatchCounterBreakIn: "00:00",
-  //       loading: false,
-  //       progressBarPercentage: 0,
-  //       showAlertPopup: false,
-  //       isCheckOutPopup: false,
-  //     });
-  //     console.log(params);
-  //     const full_name = `${employeeDetails.full_name} Force checked Out successfully`;
-  //     Toast.show(full_name,Toast.LONG);
-  //     }
 
   /**
    * Check the team member is out of the radius
@@ -1098,7 +915,7 @@ postCheckout = async (isEndOfWork = false) => {
     await this.trackRef.locationTrackingNewApi(checkindata, this.isTripEnd)
   };
 
- getCheckinDict = async () => {
+  getCheckinDict = async () => {
     let isTracking = await getData(LocalDBItems.isLocationTrackingNeeded);
     const checkInOutDetails = await getData(LocalDBItems.CHECK_IN_OUT_DETAILS);
     let dict = {};
@@ -1144,11 +961,11 @@ postCheckout = async (isEndOfWork = false) => {
     return dict;
   };
 
-    calcDistance = (newLatLng, prevLatLng) => {
-      let distance = haversine(prevLatLng, newLatLng) || 0;
-      // const { prevLatLng } = this.state;
-      return distance;
-    };
+  calcDistance = (newLatLng, prevLatLng) => {
+    let distance = haversine(prevLatLng, newLatLng) || 0;
+    // const { prevLatLng } = this.state;
+    return distance;
+  };
   getRandomUUID = async () => {
     let udid = await getData(LocalDBItems.groupUUID);
     if (udid == "" || udid == null) {
@@ -1213,7 +1030,7 @@ postCheckout = async (isEndOfWork = false) => {
     }, 800);
   };
 
- fetchGeocoderObject = async () => {
+  fetchGeocoderObject = async () => {
     let locationObj = await getData(LocalDBItems.location);
     if (locationObj) {
       console.log("locationObj.latitude", locationObj.latitude);
@@ -1222,7 +1039,7 @@ postCheckout = async (isEndOfWork = false) => {
         locationObj.latitude,
         locationObj.longitude
       );
- 
+
       this.currentLocationObj = locationName;
       if (this.currentLocationObj) {
         return true;
@@ -1528,22 +1345,22 @@ postCheckout = async (isEndOfWork = false) => {
   };
 
 
-navigateToAuthScreen = async () => {
-  console.log("Wiping data..."); // Debug
-  await wipeData();
-  console.log("Data wiped"); // Debug
-  
-  if (this.locationFetcher != null) {
-    console.log("Cleaning up location fetcher..."); // Debug
-    this.locationFetcher.removeListners();
-    this.locationFetcher.removeLocationUpdate();
-    this.locationFetcher = null;
-  }
+  navigateToAuthScreen = async () => {
+    console.log("Wiping data..."); // Debug
+    await wipeData();
+    console.log("Data wiped"); // Debug
 
-  console.log("Setting auth flag..."); // Debug
-  await storeData(LocalDBItems.isUserAuthenticated, false);
-  NavigationService.navigateAndReset("Auth",{})
-};
+    if (this.locationFetcher != null) {
+      console.log("Cleaning up location fetcher..."); // Debug
+      this.locationFetcher.removeListners();
+      this.locationFetcher.removeLocationUpdate();
+      this.locationFetcher = null;
+    }
+
+    console.log("Setting auth flag..."); // Debug
+    await storeData(LocalDBItems.isUserAuthenticated, false);
+    NavigationService.navigateAndReset("Auth", {})
+  };
 
   renderCheckBreakButton() {
     const {
@@ -1670,42 +1487,37 @@ navigateToAuthScreen = async () => {
 
   }
   modalCheckOut = () => {
-  // Close modal immediately for better UX
-  this.setState({ 
-    showAlertPopup: false, 
-    isCheckOutPopup: false 
-  }, () => {
-    // Then start checkout process
-    this.postCheckout(false);
-  });
+    // Close modal immediately for better UX
+    this.setState({
+      showAlertPopup: false,
+      isCheckOutPopup: false
+    }, () => {
+      // Then start checkout process
+      this.postCheckout(false);
+    });
   };
 
-  modalCloseForceCheckoutAction = () => {
-  this.setState({ 
-    isForceCheckoutPopUp: false,
-    loading: false 
-  });
-};
+
 
   modalEndOfWork = async () => {
-  this.setState({ 
-    showAlertPopup: false, 
-    isCheckOutPopup: false 
-  }, async () => {
-    await this.resetTracking();
-    this.postCheckout(true);
-  });
+    this.setState({
+      showAlertPopup: false,
+      isCheckOutPopup: false
+    }, async () => {
+      await this.resetTracking();
+      this.postCheckout(true);
+    });
   };
 
   modalLogout = () => {
-  console.log("Starting logout process..."); // Debug
-  //Geolocation.stopObserving();
-  this.setState({ showAlertPopup: false, isCheckOutPopup: false }, () => {
-    console.log("State updated, navigating to Auth..."); // Debug
-    this.navigateToAuthScreen();
-  });
-  
-   };
+    console.log("Starting logout process..."); // Debug
+    Geolocation.stopObserving();
+    this.setState({ showAlertPopup: false, isCheckOutPopup: false }, () => {
+      console.log("State updated, navigating to Auth..."); // Debug
+      this.navigateToAuthScreen();
+    });
+
+  };
   resetTracking = async () => {
     await storeData(LocalDBItems.isLocationTrackingNeeded, false);
     await storeData(LocalDBItems.locationArray, []);
@@ -1727,7 +1539,7 @@ navigateToAuthScreen = async () => {
         {
           text: "OK",
           onPress: () => {
-            this.setState({  isCheckOutPopup: false });
+            this.setState({ showAlertPopup:true, isCheckOutPopup: false });
             this.navigateToAuthScreen();
           },
           style: 'default',
@@ -1738,10 +1550,7 @@ navigateToAuthScreen = async () => {
         },
       ])
     } else {
-     if(this.setState({ showAlertPopup: true, isCheckOutPopup: false })){
-      this.navigateToAuthScreen();
-
-     }
+      this.setState({ showAlertPopup: true, isCheckOutPopup: false })
     }
   };
 
@@ -1764,19 +1573,19 @@ navigateToAuthScreen = async () => {
   renderAdminPrivilage() {
     if (this.employeeDetails.is_superadmin || this.employeeDetails.is_admin) {
       return (
-        
-          <TouchableOpacity
-            style={{
-              position: "absolute",
-              justifyContent: "flex-start",
-              alignItems: "flex-end",
-              left: 20,
-              bottom: 20,
-            }}
-            onPress={() => this.navigateToViewRoleScreen()}
-          >
-            <Icon name="home" size={35} color="white" />
-          </TouchableOpacity>
+
+        <TouchableOpacity
+          style={{
+            position: "absolute",
+            justifyContent: "flex-start",
+            alignItems: "flex-end",
+            left: 20,
+            bottom: 20,
+          }}
+          onPress={() => this.navigateToViewRoleScreen()}
+        >
+          <Icon name="home" size={35} color="white" />
+        </TouchableOpacity>
 
       );
     }
@@ -1903,7 +1712,7 @@ navigateToAuthScreen = async () => {
           >
             <Icon name="logout" size={30} color="white" />
           </TouchableOpacity>
-        </LinearGradient> 
+        </LinearGradient>
         <View
           style={{
             padding: 10,
@@ -1911,7 +1720,7 @@ navigateToAuthScreen = async () => {
             alignItems: "center",
             justifyContent: "center",
           }}>
-          
+
           <Text
             style={{
               paddingLeft: 10,
@@ -2011,6 +1820,7 @@ navigateToAuthScreen = async () => {
             </View>
           )}
         </View>
+
         {this.renderCheckBreakButton()}
         {/* {this.state.isGroupCheckIn === true ? (
           <CustomPopUp
@@ -2040,12 +1850,13 @@ navigateToAuthScreen = async () => {
         />
         <ErrorAlertPopup
           modalVisible={this.state.isForceCheckoutPopUp}
-          modalCloseAlertAction={this.modalCloseForceCheckoutAction}
+          modalCloseAlertAction={this.modalCloseAlertAction}
           modalCheckOutAction={this.modalCheckOut}
           modalEndOfWorkAction={this.modalEndOfWork}
           modalLogoutAction={this.modalforcecheckoutaction}
           isCheckOutPopup={this.state.isForceCheckoutPopUp}
         />
+
         {this.state.showLiveTrackingButton &&
           <ViewLiveTrackingScreen
             ref={(trackingObj) => this.trackRef = trackingObj}

@@ -27,6 +27,7 @@ const windowHeight = Dimensions.get('window').height;
 export default class ViewLiveTrackingScreen extends React.Component {
   constructor(props) {
     super(props);
+    console.log('ViewLiveTrackingScreen: Constructor called');
     this.state = {
       locationTrackingCoordinates: [],
       showTrackingStatus: 'Initializing location...',
@@ -40,45 +41,40 @@ export default class ViewLiveTrackingScreen extends React.Component {
     this.locationInfoArray = [];
     this.watchID = null;
     this.isTripEnd = false;
+   
+    console.log('ViewLiveTrackingScreen: Initial state set', this.state);
   }
 
-  async componentDidMount() {
-    console.log("[LiveTracking] 🔄 componentDidMount called");
+  componentDidMount = async () => {
+    console.log('ViewLiveTrackingScreen: componentDidMount called');
 
-    // ✅ Ask for permissions
-    if (Platform.OS === 'ios') {
-      console.log("[LiveTracking] 📲 Requesting iOS location authorization");
-      Geolocation.requestAuthorization('always');
-    } else {
-      console.log("[LiveTracking] 📲 Requesting Android location permission");
-      await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-      );
-    }
-
-    // Load any previously unsynced location data
+    try {
     const storedLocations = await getData(LocalDBItems.locationArrayForTracing);
+      console.log('ViewLiveTrackingScreen: Retrieved stored locations from DB', storedLocations);
+     
     if (storedLocations && storedLocations.length > 0) {
       this.locationInfoArray = storedLocations;
       this.setState({ showTrackingStatus: 'Resuming tracking...' });
       console.log("[LiveTracking] 📂 Loaded stored locations:", storedLocations.length);
     } else {
       this.setState({ showTrackingStatus: 'Starting new trip...' });
+        console.log('ViewLiveTrackingScreen: Starting new trip, no stored locations found');
     }
 
-    // ✅ Start watching location
     this.watchID = Geolocation.watchPosition(
       async (position) => {
-        console.log("[LiveTracking] 📍 New position received:", position.coords);
-
+          console.log('ViewLiveTrackingScreen: New position received', position);
         const location = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         };
         this.cordinateObj = location;
         this.setState({ showTrackingStatus: 'Tracking location...' });
+          console.log('ViewLiveTrackingScreen: Updated current location', location);
 
         const isTracking = await getData(LocalDBItems.isLocationTrackingNeeded);
+          console.log('ViewLiveTrackingScreen: Location tracking enabled?', isTracking);
+         
         if (isTracking) {
           console.log("[LiveTracking] ✅ Tracking is enabled. Handling location.");
           this.handleLocationTracking(location);
@@ -87,28 +83,31 @@ export default class ViewLiveTrackingScreen extends React.Component {
         }
       },
       (error) => {
-        console.error("[LiveTracking] ❌ Geolocation Error:", error.code, error.message);
+          console.error("ViewLiveTrackingScreen: Geolocation Error:", error.code, error.message);
         let errorMessage = `Code: ${error.code}, Message: ${error.message}`;
         let errorType = "GEOLOCATION_ERROR";
 
         switch (error.code) {
           case 1:
-            errorMessage = "Location permission denied. Please enable location services.";
+              errorMessage = "Location permission denied. Please enable location services for this app.";
             errorType = "PERMISSION_DENIED";
             break;
           case 2:
-            errorMessage = "Location unavailable. Check GPS settings.";
+              errorMessage = "Location information is unavailable. Check your device's GPS settings.";
             errorType = "POSITION_UNAVAILABLE";
             break;
           case 3:
-            errorMessage = "Location request timed out.";
+              errorMessage = "Location request timed out. Trying again...";
             errorType = "LOCATION_TIMEOUT";
             break;
+            default:
+              break;
         }
         this.setState({ showTrackingStatus: `Error: ${errorMessage}` });
+          console.error('ViewLiveTrackingScreen: Geolocation error details:', errorType, errorMessage);
         this.logErrorToApi(errorType, errorMessage);
       },
-      {
+     {
         accuracy: {
           android: 'high',
           ios: 'bestForNavigation',
@@ -120,36 +119,68 @@ export default class ViewLiveTrackingScreen extends React.Component {
         showsBackgroundLocationIndicator: true, // iOS shows blue bar when tracking
       },
     );
+     
+      console.log('ViewLiveTrackingScreen: Geolocation watch started with ID:', this.watchID);
+    } catch (error) {
+      console.error('ViewLiveTrackingScreen: Error in componentDidMount:', error);
   }
+}
 
   componentWillUnmount() {
     console.log("[LiveTracking] 🛑 componentWillUnmount called, clearing watch");
     if (this.watchID !== null) {
       Geolocation.clearWatch(this.watchID);
+      console.log('ViewLiveTrackingScreen: Cleared geolocation watch with ID:', this.watchID);
     }
-  }
+  };
 
   handleLocationTracking = async (location) => {
     console.log("[LiveTracking] ➕ Adding new location to array:", location);
     this.locationInfoArray.push(location);
+    console.log('ViewLiveTrackingScreen: Location array now has', this.locationInfoArray.length, 'items');
+   
+    try {
     await storeData(LocalDBItems.locationArrayForTracing, this.locationInfoArray);
+      console.log('ViewLiveTrackingScreen: Successfully stored location array in local DB');
+    } catch (storageError) {
+      console.error('ViewLiveTrackingScreen: Error storing location data:', storageError);
+    }
 
     if (this.mapRef) {
+      console.log('ViewLiveTrackingScreen: Updating map with new location');
       this.mapRef.trackLocationOnMap(location);
+    } else {
+      console.log('ViewLiveTrackingScreen: Map reference not available yet');
     }
     this.syncLocationToApi();
   };
 
   syncLocationToApi = async () => {
+    console.log('ViewLiveTrackingScreen: syncLocationToApi called');
+   
+    try {
     const isTracking = await getData(LocalDBItems.isLocationTrackingNeeded);
+      console.log('ViewLiveTrackingScreen: Tracking enabled for sync?', isTracking);
+     
     if (isTracking && !this.state.isSyncing) {
       const difference = (new Date().getTime() - this.previousTimeStamp.getTime()) / 1000;
-      console.log("[LiveTracking] ⏱ Time since last sync:", difference, "seconds");
-      if (difference > 120 && this.locationInfoArray.length > 0) {
+        console.log('ViewLiveTrackingScreen: Time difference since last sync:', difference, 'seconds');
+        console.log('ViewLiveTrackingScreen: Location array length:', this.locationInfoArray.length);
+       
+        if (difference > 2 * 60 && this.locationInfoArray.length > 0) {
+          console.log('ViewLiveTrackingScreen: Conditions met for API sync');
         this.setState({ isSyncing: true, showTrackingStatus: 'Syncing data...' });
         await this.locationTrackingNewApi();
         this.setState({ isSyncing: false });
+        } else {
+          console.log('ViewLiveTrackingScreen: Sync conditions not met or no data to sync');
+        }
+      } else {
+        console.log('ViewLiveTrackingScreen: Tracking disabled or sync already in progress');
       }
+    } catch (error) {
+      console.error('ViewLiveTrackingScreen: Error in syncLocationToApi:', error);
+      this.setState({ isSyncing: false });
     }
   };
 
@@ -160,9 +191,10 @@ locationTrackingNewApi = async (checkInInfo) => {
   console.log("[LiveTracking] 🚀 Starting sync process...");
 
   const locationArrayToSend = [...this.locationInfoArray];
-  if (locationArrayToSend.length > 0) {
-    console.log(`[LiveTracking] Preparing ${locationArrayToSend.length} points for API payload.`);
+    console.log('ViewLiveTrackingScreen: Preparing to send', locationArrayToSend.length, 'locations to API');
 
+    if (locationArrayToSend.length > 0) {
+      try {
     const groupUUID = await this.getRandomUUID();
     const id = await UUIDGenerator.getRandomUUID();
     const checkoutLocationInfo = await getData(LocalDBItems.checkOutLocationInfo);
@@ -170,9 +202,10 @@ locationTrackingNewApi = async (checkInInfo) => {
     const distance = getPathLength(locationArrayToSend) / 1000;
     const date = new Date();
 
-    console.log("[LiveTracking] 🆔 Generated IDs:", { id, groupUUID });
-    console.log("[LiveTracking] Employee details:", employeeDetails);
-    console.log("[LiveTracking] Checkout info:", checkoutLocationInfo);
+        console.log('ViewLiveTrackingScreen: Generated UUIDs - group:', groupUUID, 'id:', id);
+        console.log('ViewLiveTrackingScreen: Checkout location info:', checkoutLocationInfo);
+        console.log('ViewLiveTrackingScreen: Employee details:', employeeDetails);
+        console.log('ViewLiveTrackingScreen: Calculated distance:', distance, 'km');
 
     const newLocationArrayMapped = locationArrayToSend.map((locationItem) => {
       return {
@@ -183,45 +216,40 @@ locationTrackingNewApi = async (checkInInfo) => {
       };
     });
 
-    // -----------------------
-    // ✅ Normalize check-in dict
-    // -----------------------
+        console.log('ViewLiveTrackingScreen: Mapped location array:', newLocationArrayMapped);
+ 
     let checkInDict = {};
     if (checkInInfo) {
       console.log("[LiveTracking] ✅ Using check-in info from argument");
       checkInDict = checkInInfo;
+          console.log('ViewLiveTrackingScreen: Using provided checkInInfo');
     } else if (this.props.checkinDict) {
       console.log("[LiveTracking] ✅ Using check-in info from props");
       checkInDict = this.props.checkinDict;
+          console.log('ViewLiveTrackingScreen: Using props checkinDict');
     }
 
-    // unwrap if it's a promise-like object { _h, _i, _j, _k }
-    if (checkInDict && checkInDict._j) {
-      console.log("[LiveTracking] 🔄 Normalizing checkInDict from _j");
-      checkInDict = checkInDict._j;
-    }
-
-    console.log("checkInDict (normalized):", checkInDict);
+        console.log('ViewLiveTrackingScreen: Final checkInDict:', checkInDict);
 
     const dict = {
-      id: id,
-      empid: employeeDetails?.id,
-      groupid: groupUUID,
-      distance: distance,
-      checkout_formatted_address: checkoutLocationInfo?.formatted_address || "",
-      checkout_lat: checkoutLocationInfo?.latitude || 0.0,
-      checkout_lang: checkoutLocationInfo?.longitude || 0.0,
-      checkout_street_number: checkoutLocationInfo?.street_number || "",
-      checkout_route: checkoutLocationInfo?.route || "",
-      checkout_locality: checkoutLocationInfo?.locality || "",
-      checkout_administrative_area_level_2: checkoutLocationInfo?.administrative_area_level_2 || "",
-      checkout_administrative_area_level_1: checkoutLocationInfo?.administrative_area_level_1 || "",
-      checkin_formatted_address: checkInDict?.formatted_address || "",
-      travelClaimTrack: newLocationArrayMapped,
-      created_date: date,
-      is_trip_end: this.isTripEnd,
-      createdby: employeeDetails?.full_name,
-      ...checkInDict, // spread in case there are more fields
+          "id": id,
+          "empid": employeeDetails?.id,
+          "groupid": groupUUID,
+          "distance": distance,
+          "checkout_formatted_address": checkoutLocationInfo?.formatted_address || "",
+          "checkout_lat": checkoutLocationInfo?.latitude || 0.0,
+          "checkout_lang": checkoutLocationInfo?.longitude || 0.0,
+          "checkout_street_number": checkoutLocationInfo?.street_number || "",
+          "checkout_route": checkoutLocationInfo?.route || "",
+          "checkout_locality": checkoutLocationInfo?.locality || "",
+          "checkout_administrative_area_level_2": checkoutLocationInfo?.administrative_area_level_2 || "",
+          "checkout_administrative_area_level_1": checkoutLocationInfo?.administrative_area_level_1 || "",
+          "checkin_formatted_address": checkInDict?.checkin_formatted_address || "",
+          "travelClaimTrack": newLocationArrayMapped,
+          "created_date": date,
+          "is_trip_end": this.isTripEnd,
+          "createdby": employeeDetails?.full_name,
+          ...checkInDict
     };
 
     console.log("[LiveTracking] 📦 Final payload being sent to server:", dict);
@@ -232,7 +260,8 @@ locationTrackingNewApi = async (checkInInfo) => {
       params: dict,
     };
 
-    try {
+        console.log('ViewLiveTrackingScreen: API request object:', requestObj);
+ 
       const apiResponseData = await apiService(requestObj);
       console.log("[LiveTracking] 🌐 API response:", apiResponseData);
       if (apiResponseData.status === "200") {
@@ -276,6 +305,8 @@ locationTrackingNewApi = async (checkInInfo) => {
         timestamp: new Date().toISOString(),
       };
  
+      console.log('ViewLiveTrackingScreen: Error log data:', logData);
+ 
       const requestObj = {
         endpoint: BaseUrl.API_BASE_URL + Endpoint.ERROR_LOGGING, // Ensure Endpoint.ERROR_LOGGING is defined
         type: 'post',
@@ -297,25 +328,37 @@ locationTrackingNewApi = async (checkInInfo) => {
    * Method to get a random UUID
    */
   getRandomUUID = async () => {
+    console.log('ViewLiveTrackingScreen: getRandomUUID called');
+   
+    try {
     let udid = await getData(LocalDBItems.groupUUID);
+      console.log('ViewLiveTrackingScreen: Retrieved UUID from storage:', udid);
+     
     if (udid === "" || udid === null) {
       udid = await UUIDGenerator.getRandomUUID();
       await storeData(LocalDBItems.groupUUID, udid);
+        console.log('ViewLiveTrackingScreen: Generated and stored new UUID:', udid);
     }
     return udid;
+    } catch (error) {
+      console.error('ViewLiveTrackingScreen: Error in getRandomUUID:', error);
+      const fallbackUUID = await UUIDGenerator.getRandomUUID();
+      console.log('ViewLiveTrackingScreen: Using fallback UUID:', fallbackUUID);
+      return fallbackUUID;
+    }
   };
  
-  /**
-   * Method to fire the location object to the listener classes
-   * (This method seems to be for an external listener, not directly used for map plotting here)
-   */
   getLocationForTracking = async (locationObj) => {
+    console.log('ViewLiveTrackingScreen: getLocationForTracking called with:', locationObj);
+   
     this.cordinateObj.latitude = locationObj.latitude;
     this.cordinateObj.longitude = locationObj.longitude;
     DeviceEventEmitter.emit('locationEvent', locationObj);
+    console.log('ViewLiveTrackingScreen: Emitted location event');
   };
 
   render() {
+    console.log('ViewLiveTrackingScreen: render called');
     const { showTrackingStatus, isSyncing } = this.state;
     return (
       <Modal
@@ -340,7 +383,10 @@ locationTrackingNewApi = async (checkInInfo) => {
                   marginTop: 40,
                   backgroundColor: "transparent",
                 }}
-                onPress={() => this.props.hideLiveTracking()}
+                onPress={() => {
+                  console.log('ViewLiveTrackingScreen: Close button pressed');
+                  this.props.hideLiveTracking();
+                }}
               >
                 <IconImage name="angle-left" size={30} color="white" />
               </TouchableOpacity>

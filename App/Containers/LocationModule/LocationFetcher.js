@@ -284,7 +284,7 @@ class LocationFetcher extends React.Component {
       );
       
       // Start watching position for continuous updates
-      this.watchId = Geolocation.watchPosition(
+      this.watchId = Geolocation.watchPosition( 
         async (position) => {
           this.handleLocationUpdate(position);
         },
