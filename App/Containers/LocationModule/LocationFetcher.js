@@ -150,9 +150,9 @@ class LocationFetcher extends React.Component {
       },
       {
         enableHighAccuracy: true,
-        distanceFilter: 0,
-        interval: 5000,
-        fastestInterval: 2000,
+        distanceFilter: 5, // Lower for smoother path
+        interval: 2000,
+        fastestInterval: 1000,
         useSignificantChanges: false
       }
     );
@@ -162,47 +162,45 @@ class LocationFetcher extends React.Component {
 * Handle location update for both platforms
 */
   handleLocationUpdate = async (e) => {
-    let locationLocalObj = {
-      latitude: e.coords.latitude,
-      longitude: e.coords.longitude,
-      speed: Number(e.coords.speed * 3.6),
-      timeStamp: e.timestamp,
-    };
-    
-    let isAuthenitcated = await getData(LocalDBItems.isUserAuthenticated);
-    
-    if (isAuthenitcated) {
-      if (this.state.isInitialLoad) {
-        await storeData(LocalDBItems.location, locationLocalObj);
-      }
+    // Filter out inaccurate locations
+    if (e.coords.accuracy < 30) {
+      let locationLocalObj = {
+        latitude: e.coords.latitude,
+        longitude: e.coords.longitude,
+        speed: Number(e.coords.speed * 3.6),
+        timeStamp: e.timestamp,
+      };
       
-      let difference = (new Date().getTime() - this.previousTimeStamp.getTime()) / 1000;
-      let previusLocation = await getData(LocalDBItems.location);
-      let distance = 0;
-      
-      if (previusLocation) {
-        distance = UtilityHelper.calcDistance(previusLocation, locationLocalObj);
-      }
-      
-      let isinRadiusObj = await this.isLocationInRadius();
-      if (this.props.isInRadiusOrNot) {
-        this.props.isInRadiusOrNot(isinRadiusObj);
-      }
-      
-      if ((distance > 10) || this.state.isInitialLoad) {
-        console.log('***  There is a change of 10 meters  ***');
-        if ("getLocationForTracking" in this.props) {
-          this.props.getLocationForTracking(locationLocalObj);
-          this.saveLocation(locationLocalObj);
+      let isAuthenitcated = await getData(LocalDBItems.isUserAuthenticated);
+      if (isAuthenitcated) {
+        if (this.state.isInitialLoad) {
+          await storeData(LocalDBItems.location, locationLocalObj);
+        }
+        let difference = (new Date().getTime() - this.previousTimeStamp.getTime()) / 1000;
+        let previusLocation = await getData(LocalDBItems.location);
+        let distance = 0;
+        if (previusLocation) {
+          distance = UtilityHelper.calcDistance(previusLocation, locationLocalObj);
+        }
+        let isinRadiusObj = await this.isLocationInRadius();
+        if (this.props.isInRadiusOrNot) {
+          this.props.isInRadiusOrNot(isinRadiusObj);
+        }
+        if ((distance > 10) || this.state.isInitialLoad) {
+          if ("getLocationForTracking" in this.props) {
+            this.props.getLocationForTracking(locationLocalObj);
+            this.saveLocation(locationLocalObj);
+          }
+        }
+        if ((difference > 60 && distance > 250) || this.state.isInitialLoad) {
+          await storeData(LocalDBItems.location, locationLocalObj);
+          this.state.isInitialLoad = false;
+          this.previousTimeStamp = new Date();
+          this.processLocation(locationLocalObj);
         }
       }
-      
-      if ((difference > 60 && distance > 250) || this.state.isInitialLoad) {
-        await storeData(LocalDBItems.location, locationLocalObj);
-        this.state.isInitialLoad = false;
-        this.previousTimeStamp = new Date();
-        this.processLocation(locationLocalObj);
-      }
+    } else {
+      console.log('Skipping inaccurate location:', e.coords.accuracy);
     }
   };
  
@@ -244,7 +242,7 @@ class LocationFetcher extends React.Component {
         (error) => {
           console.log(error);
         },
-        { enableHighAccuracy: true, distanceFilter: 0, interval: 5000, fastestInterval: 2000 }
+        { enableHighAccuracy: true, distanceFilter: 5, interval: 2000, fastestInterval: 1000 }
       );
     }
      
@@ -284,7 +282,7 @@ class LocationFetcher extends React.Component {
       );
       
       // Start watching position for continuous updates
-      this.watchId = Geolocation.watchPosition( 
+      this.watchId = Geolocation.watchPosition(
         async (position) => {
           this.handleLocationUpdate(position);
         },
@@ -293,9 +291,9 @@ class LocationFetcher extends React.Component {
         },
         {
           enableHighAccuracy: true,
-          distanceFilter: 10, // 10 meters
-          interval: 5000,
-          fastestInterval: 2000,
+          distanceFilter: 5, // Lower for smoother path
+          interval: 2000,
+          fastestInterval: 1000,
           useSignificantChanges: false
         }
       );

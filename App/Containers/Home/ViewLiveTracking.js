@@ -63,23 +63,20 @@ export default class ViewLiveTrackingScreen extends React.Component {
 
     this.watchID = Geolocation.watchPosition(
       async (position) => {
-          console.log('ViewLiveTrackingScreen: New position received', position);
-        const location = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        };
-        this.cordinateObj = location;
-        this.setState({ showTrackingStatus: 'Tracking location...' });
-          console.log('ViewLiveTrackingScreen: Updated current location', location);
-
-        const isTracking = await getData(LocalDBItems.isLocationTrackingNeeded);
-          console.log('ViewLiveTrackingScreen: Location tracking enabled?', isTracking);
-         
-        if (isTracking) {
-          console.log("[LiveTracking] ✅ Tracking is enabled. Handling location.");
-          this.handleLocationTracking(location);
+        // Filter out inaccurate locations
+        if (position.coords.accuracy < 50) {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+          this.cordinateObj = location;
+          this.setState({ showTrackingStatus: 'Tracking location...' });
+          const isTracking = await getData(LocalDBItems.isLocationTrackingNeeded);
+          if (isTracking) {
+            this.handleLocationTracking(location);
+          }
         } else {
-          console.log("[LiveTracking] ⏸ Tracking is disabled in storage.");
+          console.log('Skipping inaccurate location:', position.coords.accuracy);
         }
       },
       (error) => {
@@ -110,12 +107,12 @@ export default class ViewLiveTrackingScreen extends React.Component {
      {
         accuracy: {
           android: 'high',
-          ios: 'bestForNavigation',
+          ios: 'best',
         },
         enableHighAccuracy: true,
-        distanceFilter: 25,
-        interval: Platform.OS === 'android' ? 5000 : undefined,
-        fastestInterval: Platform.OS === 'android' ? 1000 : undefined,
+        distanceFilter: 10, // Lower for smoother path
+        interval: Platform.OS === 'android' ? 10000 : undefined, // 2 seconds
+        fastestInterval: Platform.OS === 'android' ? 5000 : undefined,
         showsBackgroundLocationIndicator: true, // iOS shows blue bar when tracking
       },
     );

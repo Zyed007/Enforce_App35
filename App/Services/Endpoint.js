@@ -68,7 +68,7 @@ export const Endpoint = {
    '/Employee/GetEmpListWithRolesByOrgID',
    FIND_EMPLOYEE_DESIGNATION:
    '/Employee/FindEmployeeListByDesignationID',
-   GET_ALL_EMPLOYEES_VIA_GROUPID:
+   GET_ALL_EMPLOYEES_VIA_GROUPID: 
    '/Timesheet/GetAllEmployeeByGroupID',
    HAND_OVER_CHECKOUT:
    '/Timesheet/TimesheetCheckoutHandoverByGroupID',

@@ -167,31 +167,49 @@ export default class HomeScreen extends React.Component {
    * Get last check in details by employee ID
    */
   async componentDidMount() {
-    this.getEmployeeDetails()
-    this.lastCheckinByEmpID(true)
-    this.geoCoder.initiaLizeGeoCoder()
-    this.UUID = await getUUID()
-    // Add app state listener (NEW API)
-    this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
+  try {
+    // ✅ Fetch employee details
+    await this.getEmployeeDetails();
 
-    this.getEmployeeDetails();
-    this.lastCheckinByEmpID(true);
+    // ✅ Get last checkin details
+    await this.lastCheckinByEmpID(true);
+
+    // ✅ Initialize GeoCoder
     this.geoCoder.initiaLizeGeoCoder();
-    this.UUID = await getUUID()
-    console.log(UUID, "UUID which we need");
-    this._unsubscribe = this.props.navigation.addListener("blur", () => {
-      if (this.locationFetcher != null) {
-      }
-      this.state.locationFetcherNeeded = false;
-    });
+
+    // ✅ Get unique device ID
+    this.UUID = await getUUID();
+
+    // ✅ Listen for app state changes
+    this.appStateSubscription = AppState.addEventListener(
+      "change",
+      this.handleAppStateChange
+    );
+
+    // ✅ Listen when screen comes into focus
     this._unsubscribe = this.props.navigation.addListener("focus", () => {
       this.setState({ locationFetcherNeeded: true }, () => {
         this.isInitalLoad = false;
       });
     });
-    this.getLocationTrackingNeeded()
+
+    // ✅ Listen when screen goes out of focus
+    this._unsubscribeBlur = this.props.navigation.addListener("blur", () => {
+      this.setState({ locationFetcherNeeded: false });
+    });
+
+    // ✅ Check if live tracking is needed
+    await this.getLocationTrackingNeeded();
+
+    // Reset checkout counter
     checkout_counter = 0;
+
+  } catch (error) {
+    console.error("Error in componentDidMount:", error);
+    Toast.show("Something went wrong while loading Home Screen", Toast.LONG);
   }
+  }
+
 
   getLocationTrackingNeeded = async () => {
     let isLiveTracking = await getData(LocalDBItems.isLocationTrackingNeeded)
@@ -463,6 +481,26 @@ export default class HomeScreen extends React.Component {
     }
   };
 
+  // Start 3-min loader timeout
+startLoaderTimeout = () => {
+  if (this.loaderTimeout) clearTimeout(this.loaderTimeout);
+
+  this.loaderTimeout = setTimeout(() => {
+    if (this.state.loading) {
+      Toast.show("Taking too long. Check your internet and try again.", Toast.LONG);
+      this.setState({ loading: false });
+    }
+  }, 180000); // 3 minutes = 180000 ms
+};
+
+// Stop loader timeout
+stopLoaderTimeout = () => {
+  if (this.loaderTimeout) {
+    clearTimeout(this.loaderTimeout);
+    this.loaderTimeout = null;
+  }
+};
+
 
 
   onGoBackToPreviousCheckOut = async () => {
@@ -576,6 +614,8 @@ export default class HomeScreen extends React.Component {
     let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
 
     this.setState({ loading: true });
+    this.startLoaderTimeout();
+    
 
     if (value === 'Forgot to Checkout') {
       const date = await AsyncStorage.getItem("forcetime");
@@ -684,6 +724,7 @@ export default class HomeScreen extends React.Component {
     } else {
       // API failed — stop loading and show error
       this.setState({ loading: false });
+      this.stopLoaderTimeout();
       Toast.show("Force checkout failed. Please try again.", Toast.LONG);
     }
   };
@@ -700,40 +741,33 @@ export default class HomeScreen extends React.Component {
   postCheckout = async (isEndOfWork = false) => {
     console.log("post checkout", this.currentLocationObj);
     this.setState({ loading: true });
+    this.startLoaderTimeout();
 
     try {
       const userId = await getData(LocalDBItems.employeeDetails);
       const checkInDetails = await getData(LocalDBItems.CHECK_IN_OUT_DETAILS);
       const date = await AsyncStorage.getItem("forcetime");
       let formattedTime = moment().format("MM/DD/YYYY") + " " + date;
-      let forceCheckoutTime = moment(formattedTime, "YYYY-MM-DD HH:mm").format(
-        "'YYYY-MM-DD HH:mm'"
-      );
 
-      console.log("forceCheckoutTime", forceCheckoutTime);
-
+    // ✅ Check if inside radius
       let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
-      console.log("-----205", checkIsInRadius);
 
+    // ✅ Get location details
       let isFetchedGeoCorderObj = await this.fetchGeocoderObject();
-      console.log("isFetchedGeoCorderObj", isFetchedGeoCorderObj);
-
       if (!isFetchedGeoCorderObj) {
+      this.setState({ loading: false });
+      this.stopLoaderTimeout();
         if (checkout_counter < 2) {
           Toast.show("Unable to fetch geo location info", Toast.LONG);
           checkout_counter++;
         } else {
-          this.location_feching();
-          Toast.show(
-            "We have successfully registered your Technical Error",
-            Toast.LONG
-          );
-        }
-        this.setState({ loading: false }); // 👈 stop the loader
-        return;
+        // After 2 failed tries → ask user
+        this.setState({ isForceCheckoutPopUp: true });
+      }
+      return; // ❌ stop execution here
       }
 
-      // ✅ straight forward case
+    // ✅ Build request params
       let params = {
         team_member_empid: this.checkInDataValue.empid,
         groupid: this.checkInDataValue.groupid,
@@ -749,10 +783,8 @@ export default class HomeScreen extends React.Component {
           street_number: this.currentLocationObj.street_number,
           route: this.currentLocationObj.route,
           locality: this.currentLocationObj.locality,
-          administrative_area_level_2:
-            this.currentLocationObj.administrative_area_level_2,
-          administrative_area_level_1:
-            this.currentLocationObj.administrative_area_level_1,
+        administrative_area_level_2: this.currentLocationObj.administrative_area_level_2,
+        administrative_area_level_1: this.currentLocationObj.administrative_area_level_1,
           postal_code: this.currentLocationObj.postal_code,
           country: this.currentLocationObj.country,
         },
@@ -761,16 +793,17 @@ export default class HomeScreen extends React.Component {
       await storeData(LocalDBItems.checkOutLocationInfo, this.currentLocationObj);
       console.log("Params for checkout", params);
 
+    // ✅ API call
       const requestObj = {
         endpoint: BaseUrl.API_BASE_URL + Endpoint.TIMESHEET_CHECKOUT,
         type: "post",
-        params: params,
+      params,
       };
-
       const apiResponseData = await apiService(requestObj);
       console.log("API response checkout", apiResponseData);
 
       if (apiResponseData?.status === "200") {
+      // ✅ Success
         if (isEndOfWork) {
           this.timer_error = false;
           this.isWorkEnded = true;
@@ -779,14 +812,10 @@ export default class HomeScreen extends React.Component {
           await storeData(LocalDBItems.CHECK_IN_OUT_DETAILS, checkInDetails);
           this.locationFetcher.removeLocationUpdate();
         } else {
-          this.startTracking(); // for check out
-        }
+        this.startTracking();
+      }
 
-        clearInterval(this.timerCheckIn);
-        clearInterval(this.timerBreakIn);
-        clearInterval(this.showTimerForAutoCheckOut);
-        this.timerStopCounter = 0;
-        this.timerStopForBreakCounter = 0;
+      this.cleanupTimers();
 
         this.setState({
           breakInData: null,
@@ -800,13 +829,12 @@ export default class HomeScreen extends React.Component {
           isCheckOutPopup: false,
         });
 
-        const full_name = `${userId.full_name}'s Checked Out successfully`;
-        Toast.show(full_name, Toast.LONG);
+      Toast.show(`${userId.full_name} checked out successfully`, Toast.LONG);
 
-        const checkinInfo = { isOfficeChecin: false, isProjectCheckin: false };
-        await storeData(LocalDBItems.checkInInfo, checkinInfo);
+      await storeData(LocalDBItems.checkInInfo, { isOfficeChecin: false, isProjectCheckin: false });
+
       } else {
-        console.log("checkout counter:", checkout_counter);
+      // ✅ API returned failure
         if (checkout_counter >= 2) {
           // Show force checkout popup only after 2 failed tries
           this.setState({ isForceCheckoutPopUp: true });
@@ -816,14 +844,24 @@ export default class HomeScreen extends React.Component {
           checkout_counter++;
         }
       }
+
     } catch (error) {
-      console.log("Checkout API failed", error);
+    console.error("Checkout API failed", error);
       Toast.show("Checkout failed. Please try again.", Toast.LONG);
     } finally {
-      // 🔑 guarantee loader stops no matter what
+    // ✅ Always stop loader
       this.setState({ loading: false, isCheckOutPopup: false, showAlertPopup: false });
     }
   };
+
+// ✅ New helper function
+cleanupTimers = () => {
+  clearInterval(this.timerCheckIn);
+  clearInterval(this.timerBreakIn);
+  clearInterval(this.showTimerForAutoCheckOut);
+  this.timerStopCounter = 0;
+  this.timerStopForBreakCounter = 0;
+};
 
 
 
@@ -832,6 +870,7 @@ export default class HomeScreen extends React.Component {
    */
   checkOutOnceTeamMemberAssginedOutOfRadius = async () => {
     this.setState({ loading: true });
+    this.startLoaderTimeout();
     const userId = await getData(LocalDBItems.employeeDetails);
     let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
     console.log('check radius issue')
@@ -839,6 +878,7 @@ export default class HomeScreen extends React.Component {
     if (!isFetchedGeoCorderObj) {
       // Toast.show("Unbale to fetcth geo locationinfo", Toast.LONG);
       this.setState({ loading: false });
+      this.stopLoaderTimeout();
     }
 
     let params = {
@@ -980,8 +1020,10 @@ export default class HomeScreen extends React.Component {
     if (!isFetchedGeoCorderObj) {
       //Toast.show("Unbale to fetcth geo locationinfo", Toast.LONG);
       this.setState({ loading: false });
+      this.stopLoaderTimeout();
     }
     this.setState({ loading: true });
+    this.startLoaderTimeout();
     const userId = await getData(LocalDBItems.employeeDetails);
     let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
     let params = {
@@ -1054,12 +1096,14 @@ export default class HomeScreen extends React.Component {
    */
   postBreakIn = async () => {
     this.setState({ loading: true });
+    this.startLoaderTimeout();
     const userId = await getData(LocalDBItems.employeeDetails);
     let checkIsInRadius = await this.locationFetcher.isLocationInRadius();
     let isFetchedGeoCorderObj = await this.fetchGeocoderObject();
     if (!isFetchedGeoCorderObj) {
       //Toast.show("Unbale to fetcth geo locationinfo", Toast.LONG);
       this.setState({ loading: false });
+      this.stopLoaderTimeout();
     }
     let params = {
       team_member_empid: this.checkInDataValue.empid,
@@ -1617,12 +1661,15 @@ export default class HomeScreen extends React.Component {
   };
   assignTaskToMemeber = async () => {
     this.setState({ loading: true });
+    this.startLoaderTimeout();
+
     const employeDetails = await getData(LocalDBItems.employeeDetails);
 
     let isFetchedGeoCorderObj = await this.fetchGeocoderObject();
     if (!isFetchedGeoCorderObj) {
       // Toast.show("Unbale to fetcth geo locationinfo", Toast.LONG);
       this.setState({ loading: false });
+      this.stopLoaderTimeout();
     }
 
     let params = {

@@ -127,62 +127,64 @@ export default class MapForPolyline extends React.Component {
   watchPosition = () => {
     this.watchId = Geolocation.watchPosition(
       async (position) => {
-        const { latitude, longitude } = position.coords;
-        const newCoordinate = { latitude, longitude };
-
-        let storedLocationArray = (await getData(LocalDBItems.locationArrayForTracing)) || [];
-
-        // Update path
-        const updatedRoute = [...storedLocationArray, newCoordinate];
-        const distance = getPathLength(updatedRoute) / 1000;
-
-        // For iOS, we need to handle animations differently
-        if (Platform.OS === 'ios') {
-          this.state.animatedCoordinate.timing({
-            latitude: newCoordinate.latitude,
-            longitude: newCoordinate.longitude,
-            duration: 500,
-            useNativeDriver: false,
-          }).start();
-        } else {
+        // Filter out inaccurate locations
+        if (position.coords.accuracy < 30) {
+          const { latitude, longitude } = position.coords;
+          const newCoordinate = { latitude, longitude };
+          let storedLocationArray = (await getData(LocalDBItems.locationArrayForTracing)) || [];
+          // Update path
+          const updatedRoute = [...storedLocationArray, newCoordinate];
+          // Save updated route to local storage
+          storeData(LocalDBItems.locationArrayForTracing, updatedRoute);
+          const distance = getPathLength(updatedRoute) / 1000;
+          // For iOS, we need to handle animations differently
+          if (Platform.OS === 'ios') {
+            this.state.animatedCoordinate.timing({
+              latitude: newCoordinate.latitude,
+              longitude: newCoordinate.longitude,
+              duration: 500,
+              useNativeDriver: false,
+            }).start();
+          } else {
+            this.setState({
+              animatedCoordinate: new AnimatedRegion({
+                ...newCoordinate,
+                latitudeDelta: LATITUDE_DELTA,
+                longitudeDelta: LONGITUDE_DELTA,
+              }),
+            });
+          }
           this.setState({
-            animatedCoordinate: new AnimatedRegion({
-              ...newCoordinate,
-              latitudeDelta: LATITUDE_DELTA,
-              longitudeDelta: LONGITUDE_DELTA,
-            }),
-          });
-        }
-
-        this.setState({
-          latitude,
-          longitude,
-          routeCoordinates: updatedRoute,
-          distanceTravelled: distance,
-          coordinate: {
-            ...newCoordinate,
-            latitudeDelta: LATITUDE_DELTA,
-            longitudeDelta: LONGITUDE_DELTA,
-          },
-        });
-
-        if (this.map) {
-          this.map.animateToRegion(
-            {
+            latitude,
+            longitude,
+            routeCoordinates: updatedRoute,
+            distanceTravelled: distance,
+            coordinate: {
               ...newCoordinate,
               latitudeDelta: LATITUDE_DELTA,
               longitudeDelta: LONGITUDE_DELTA,
             },
-            500
-          );
+          });
+          if (this.map) {
+            this.map.animateToRegion(
+              {
+                ...newCoordinate,
+                latitudeDelta: LATITUDE_DELTA,
+                longitudeDelta: LONGITUDE_DELTA,
+              },
+              500
+            );
+          }
+        } else {
+          console.log('Skipping inaccurate location:', position.coords.accuracy);
         }
       },
       (error) => console.warn(error),
       {
         enableHighAccuracy: true,
-        distanceFilter: 10,
-        interval: 5000,
-        fastestInterval: 2000,
+        distanceFilter: 5, // Lower for smoother path
+        interval: 2000,
+        fastestInterval: 1000,
         showLocationDialog: Platform.OS === 'android',
       }
     );

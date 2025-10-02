@@ -16,10 +16,8 @@ import color from "../../../Theme/Colors"
 import { Helpers, Images, Colors } from "../../../Theme/index";
 import LinearGradient from "react-native-linear-gradient";
 import Icon from "react-native-vector-icons/FontAwesome";
-import MaterialTabs from "react-native-material-tabs";
 import { apiService } from "../../../Services/ApiService";
 import { Endpoint, BaseUrl } from "../../../Services/Endpoint";
-import RNRestart from 'react-native-restart';
 import version from "../../../../package.json"
 import {
   getData,
@@ -27,7 +25,6 @@ import {
   storeData,
 } from "../../../Services/LocalStorage";
 import SegmentedControlTab from "react-native-segmented-control-tab";
-import Axios from "axios";
 import { CategortTeam } from "../../../Config";
 import { Switch, Chip } from "react-native-paper";
 import DropDownPicker from "react-native-dropdown-picker";
@@ -41,7 +38,7 @@ import moment from "moment";
 import { searchFaceImages } from "../../../Services/AWSService";
 import CustomPopUpModal from "../../../Components/CustomPopup";
 
-import Loader from "../../../Components/Loader";
+import Loader from "../../../Components/Loader"; //TO CHECK
 import ViewDescriptionPopupScreen from "./ViewDescriptionScreen";
 import { Modalize } from "react-native-modalize";
 import * as NavigationService from "../../../Services/NavigationService";
@@ -50,13 +47,12 @@ import SwitchViewNew from "./SwitchView";
 import * as Progress from 'react-native-progress';
 import LocationError from "../../../Components/LocationError"
 import { getUUID } from "../../../helper";
-import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+
+//import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import RNFS from 'react-native-fs';
 import FaceRecognitionCamera from './FaceRecognitionCamera';
 
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import { TabView, TabBar } from 'react-native-tab-view';
-
 import { MaterialTopTabBar } from '@react-navigation/material-top-tabs';
 
 
@@ -474,7 +470,7 @@ handleFocusEvent = () => {
     else {
       console.log("Checin in the Second area");
       this.GetAllTimesheetListByEmployeeID();
-      this.reason_face = "Face Recognition Issue";
+      this.reason_face = "face Recogonisation Issue";
     }
   };
 
@@ -652,7 +648,7 @@ handleFocusEvent = () => {
   }
 
 flushtimer = () => {
-  addLog("Start button clicked - Bypassing face verification");
+  addLog("Start button clicked");
   
   // // Check location validity
   // if (!this.hasValidLocation()) {
@@ -696,6 +692,7 @@ proceedWithCheckIn = () => {
    * Verify face and show timer
    * @returns
    */
+  
   verifyFaceRekcongition = async () => {
     addLog("Starting face verification process");
 
@@ -738,8 +735,52 @@ proceedWithCheckIn = () => {
     } catch (error) {
       addLog(`Verification failed: ${error.message}`);
       this.setState({ showCameraLoader: false });
+      Toast.show(`Verification failed: ${error.message}`);
     }
   };
+  
+  /**
+   * Without Face recognition
+   */
+
+  // verifyFaceRekcongition = async () => {
+  //   this.timer_error = false; 
+  //   console.log("on", this.currentLocationObj); 
+  //   console.log(this.isAllowtocheckin, "allow checkin"); 
+  //   console.log(this.state.isOffice, "is Office"); // ✅ Basic office validation 
+  //   if (this.state.isForceCheckIn === false) {
+  //     if (this.state.isOffice) {
+  //       await this.onChoosePlaceOffice(true);
+  //     } if (this.isAllowtocheckin === false && this.state.isOffice) {
+  //       Alert.alert("Office", "Your current location isn't matched with the office location"); return;
+  //     }
+  //   }
+  //   // ✅ Work from home check 
+  //   if (this.state.isWorkFromHome && this.currentLocationObj.formatted_address === "") {
+  //     Alert.alert("Work from home", "Unable to fetch current location");
+  //     return;
+  //   } // ✅ Manual check-in validation
+  //   if (this.state.isManual && this.currentLocationObj.formatted_address === "") {
+  //     Alert.alert("Error", "Enter reason or location");
+  //     return;
+  //   }
+  //   // ✅ Make sure we have location 
+  //   const isHaveLocation = this.getLocationAddressForPlace();
+  //   if (isHaveLocation === "") {
+  //     Alert.alert("Error", "Location couldn't be fetched"); return;
+  //   } // 🚀 BYPASS FACE VERIFICATION AND DIRECTLY PROCEED TO CHECK-IN 
+  //   if (this.state.isForceCheckIn === true) {
+  //     console.log("Proceeding with Force Check-In");
+  //     this.addTimesheetForceCheckIn();
+  //   }
+  //   else {
+  //     console.log("Proceeding with Normal Check-In");
+  //     this.addTimesheetCheckIn();
+  //   }
+  // };
+
+
+
 
 
   handleSubmission = async () => {
